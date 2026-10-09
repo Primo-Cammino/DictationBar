@@ -1,0 +1,13 @@
+.DS_Store
+build/
+DerivedData/
+*.xcresult/
+xcuserdata/
+*.xcuserstate
+*.xcodeproj/project.xcworkspace/
+
+# Per-checkout Compound Engineering overrides
+.compound-engineering/config.local.yaml
+
+# Local safety copies; preserve on disk, never publish
+.local-backups/
