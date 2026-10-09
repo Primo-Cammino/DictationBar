@@ -1,0 +1,5 @@
+# Local checkout policy: native execution, no external peer or shipping route.
+docs_root: docs
+work_engine_mode: off
+work_engine_preferences: []
+cross_model_review_mode: off

@@ -34,18 +34,19 @@ final class PermissionMappingTests: XCTestCase {
 
     @MainActor
     func testAuthorizedMicrophoneDoesNotConfirmSystemAudio() async {
-        let reader = NativePermissionReader {
+        let reader = NativePermissionReader(microphoneAuthorization: {
             AVAuthorizationStatus.authorized.rawValue
-        }
+        }, screenCaptureAccess: { false })
 
         XCTAssertEqual(reader.snapshot().systemAudio, .notVerified)
-        XCTAssertEqual(reader.snapshot().systemAudio.title, "Noch nicht geprüft")
+        XCTAssertEqual(reader.snapshot().systemAudio.title, "Noch nicht erlaubt")
+        XCTAssertEqual(NativePermissionReader(screenCaptureAccess: { true }).snapshot().systemAudio, .authorized)
     }
 
     @MainActor
     func testReadingAgainReflectsChangedAuthorization() async {
         var status = AVAuthorizationStatus.notDetermined
-        let reader = NativePermissionReader { status.rawValue }
+        let reader = NativePermissionReader(microphoneAuthorization: { status.rawValue }, screenCaptureAccess: { false })
 
         XCTAssertEqual(reader.snapshot().microphone, .notDetermined)
 

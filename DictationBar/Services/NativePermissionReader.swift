@@ -1,13 +1,16 @@
 import AVFoundation
+import CoreGraphics
 
 @MainActor
 struct NativePermissionReader: PermissionReading {
     private let microphoneAuthorization: () -> Int
+    private let screenCaptureAccess: () -> Bool
 
     init(microphoneAuthorization: @escaping () -> Int = {
         AVCaptureDevice.authorizationStatus(for: .audio).rawValue
-    }) {
+    }, screenCaptureAccess: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }) {
         self.microphoneAuthorization = microphoneAuthorization
+        self.screenCaptureAccess = screenCaptureAccess
     }
 
     func snapshot() -> PermissionSnapshot {
@@ -28,7 +31,7 @@ struct NativePermissionReader: PermissionReading {
 
         return PermissionSnapshot(
             microphone: microphone,
-            systemAudio: .notVerified
+            systemAudio: screenCaptureAccess() ? .authorized : .notVerified
         )
     }
 }

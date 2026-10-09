@@ -20,7 +20,9 @@
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>DictationBar nimmt dein gewähltes Mikrofon auf, um dein Diktat zu transkribieren.</string>
     <key>LSUIElement</key>
-    <true/>
+    <false/>
 </dict>
 </plist>

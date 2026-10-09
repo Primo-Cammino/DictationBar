@@ -6,14 +6,15 @@
       <BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="25587E740B867FA45833A978" BuildableName="DictationBarTests.xctest" BlueprintName="DictationBarTests" ReferencedContainer="container:DictationBar.xcodeproj"/></BuildActionEntry>
     </BuildActionEntries>
   </BuildAction>
-  <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES">
+  <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="NO">
     <Testables><TestableReference skipped="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="25587E740B867FA45833A978" BuildableName="DictationBarTests.xctest" BlueprintName="DictationBarTests" ReferencedContainer="container:DictationBar.xcodeproj"/></TestableReference></Testables>
     <MacroExpansion><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="60699D6144900CAC6ABE31B3" BuildableName="DictationBar.app" BlueprintName="DictationBar" ReferencedContainer="container:DictationBar.xcodeproj"/></MacroExpansion>
+    <EnvironmentVariables><EnvironmentVariable key="DICTATIONBAR_RUNTIME" value="testing" isEnabled="YES"/></EnvironmentVariables>
   </TestAction>
   <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="NO">
     <BuildableProductRunnable runnableDebuggingMode="0"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="60699D6144900CAC6ABE31B3" BuildableName="DictationBar.app" BlueprintName="DictationBar" ReferencedContainer="container:DictationBar.xcodeproj"/></BuildableProductRunnable>
   </LaunchAction>
-  <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES">
+  <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="NO" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES">
     <BuildableProductRunnable runnableDebuggingMode="0"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="60699D6144900CAC6ABE31B3" BuildableName="DictationBar.app" BlueprintName="DictationBar" ReferencedContainer="container:DictationBar.xcodeproj"/></BuildableProductRunnable>
   </ProfileAction>
   <AnalyzeAction buildConfiguration="Debug"/>

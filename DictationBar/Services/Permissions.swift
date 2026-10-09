@@ -16,10 +16,11 @@ enum MicrophonePermission: Equatable {
     }
 }
 
+/// Screen & System Audio Recording, requested on the first deliberate browser recording.
 enum SystemAudioPermission: Equatable {
-    case notVerified
+    case notVerified, authorized
 
-    var title: String { "Noch nicht geprüft" }
+    var title: String { self == .authorized ? "Erlaubt" : "Noch nicht erlaubt" }
 }
 
 struct PermissionSnapshot: Equatable {

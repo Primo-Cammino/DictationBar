@@ -9,5 +9,11 @@ xcuserdata/
 # Per-checkout Compound Engineering overrides
 .compound-engineering/config.local.yaml
 
+# Personal Claude Code permissions for this checkout
+.claude/settings.local.json
+
 # Local safety copies; preserve on disk, never publish
 .local-backups/
+
+# Shortcut to the local, generated Debug app
+/DictationBar.app
