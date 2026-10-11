@@ -71,7 +71,9 @@ enum BrandIcon {
         // Body inset follows the macOS icon grid (824 of 1024).
         let body = NSRect(x: 50, y: 50, width: 412, height: 412)
         let shape = NSBezierPath(roundedRect: body, xRadius: 92, yRadius: 92)
-        NSGradient(starting: .systemIndigo, ending: .systemBlue)?.draw(in: shape, angle: 90)
+        // Bright sky blue at the top to a clear mid blue at the bottom.
+        NSGradient(starting: NSColor(srgbRed: 0.09, green: 0.47, blue: 0.96, alpha: 1),
+                   ending: NSColor(srgbRed: 0.42, green: 0.80, blue: 1.0, alpha: 1))?.draw(in: shape, angle: 90)
         drawSymbol("waveform", pointSize: 200, color: .white, in: body)
         return true
     }
@@ -81,9 +83,10 @@ enum BrandIcon {
             .applying(NSImage.SymbolConfiguration(paletteColors: [color]))
         guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
             .withSymbolConfiguration(config) else { return }
-        let size = symbol.size
-        symbol.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2,
-                               width: size.width, height: size.height))
+        // Center the glyph's own bounds; the image size carries uneven symbol padding.
+        let glyph = symbol.alignmentRect
+        symbol.draw(at: NSPoint(x: rect.midX - glyph.midX, y: rect.midY - glyph.midY),
+                    from: .zero, operation: .sourceOver, fraction: 1)
     }
 }
 
