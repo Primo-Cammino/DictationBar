@@ -108,7 +108,7 @@ final class RecordingStoreTests: XCTestCase {
         await history.revoke(token)
         let recovered = try await store.recover()
         XCTAssertEqual(recovered.entries.first?.status, .interrupted)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: paths.final.path))
+        XCTAssertEqual(try Data(contentsOf: paths.final), LocalStoreFixture.wav())
         entry = try XCTUnwrap(recovered.entries.first)
         entry.transcript = "Retained text"
         try await history.authorizeExisting(token); try await history.save(entry, token: token); await history.revoke(token)
@@ -118,5 +118,48 @@ final class RecordingStoreTests: XCTestCase {
         XCTAssertEqual(missing.entries.first?.status, .complete)
         let again = try await store.recover()
         XCTAssertEqual(again.entries, missing.entries)
+    }
+
+    func testCrashedStagingWithUnwrittenHeaderIsRepairedOnRecovery() async throws {
+        let f = try LocalStoreFixture(); defer { f.cleanup() }
+        for extraByte in [false, true] {
+            let history = HistoryStore(supportURL: f.support)
+            let store = RecordingStore(history: history)
+            let entry = try f.entry(); let token = f.token(entry)
+            let paths = try await store.prepare(entry, token: token)
+            // The writer leaves size 0 in the header until close(); a crash keeps it.
+            var crashed = Self.crashedWAV(frames: 144_000)
+            if extraByte { crashed.append(0) }
+            try crashed.write(to: paths.staging)
+            await history.revoke(token)
+            let recovered = try await store.recover()
+            let saved = try XCTUnwrap(recovered.entries.first { $0.id == entry.id })
+            XCTAssertEqual(saved.status, .interrupted)
+            XCTAssertEqual(saved.duration ?? 0, 3, accuracy: 0.001)
+            let bytes = try Data(contentsOf: paths.final)
+            XCTAssertEqual(bytes, LocalStoreFixture.wav(frames: 144_000))
+        }
+    }
+
+    func testCrashedStagingWithoutAudioStaysFailed() async throws {
+        let f = try LocalStoreFixture(); defer { f.cleanup() }
+        let history = HistoryStore(supportURL: f.support)
+        let store = RecordingStore(history: history)
+        let entry = try f.entry(); let token = f.token(entry)
+        let paths = try await store.prepare(entry, token: token)
+        try Self.crashedWAV(frames: 0).write(to: paths.staging)
+        await history.revoke(token)
+        let recovered = try await store.recover()
+        XCTAssertEqual(recovered.entries.first?.status, .failed)
+        XCTAssertEqual(recovered.entries.first?.message,
+                       "Lokale Aufnahme konnte nicht wiederhergestellt werden. Vorhandene Dateien bleiben erhalten.")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: paths.staging.path))
+    }
+
+    private static func crashedWAV(frames: Int) -> Data {
+        var data = LocalStoreFixture.wav(frames: frames)
+        data.replaceSubrange(4..<8, with: [36, 0, 0, 0])
+        data.replaceSubrange(40..<44, with: [0, 0, 0, 0])
+        return data
     }
 }

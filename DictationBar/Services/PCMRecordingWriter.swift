@@ -18,6 +18,7 @@ final class PCMRecordingWriter {
     private var appendFailed = false
     private var expectedFrames: Double = 0
     private(set) var writtenFrames: Int64 = 0
+    private var syncedFrames: Int64 = 0
 
     init(paths: RecordingPaths) throws {
         guard let reservation = paths.reservation else { throw LocalStoreError.collision }
@@ -191,9 +192,16 @@ final class PCMRecordingWriter {
         }
         try handle.write(contentsOf: Data(bytes: bytes, count: byteCount))
         writtenFrames += Int64(buffer.frameLength)
+        // About every 10 s of audio, flush to disk so a power loss keeps the
+        // samples; RecordingStore.recover repairs the still-empty header.
+        if writtenFrames - syncedFrames >= 480_000 {
+            try handle.synchronize()
+            syncedFrames = writtenFrames
+        }
     }
 
-    private static func header(dataBytes: UInt32) -> Data {
+    /// The writer's 44-byte PCM16 mono 48 kHz header, also used by recovery.
+    static func header(dataBytes: UInt32) -> Data {
         var result = Data()
         func ascii(_ text: String) { result.append(contentsOf: text.utf8) }
         func u16(_ value: UInt16) {

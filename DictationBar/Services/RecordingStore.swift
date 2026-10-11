@@ -153,6 +153,7 @@ actor RecordingStore {
                 guard !(staging && final) else { throw LocalStoreError.collision }
                 if staging {
                     guard entry.stagingOwned == true else { throw LocalStoreError.collision }
+                    try Self.repairHeader(at: paths.staging)
                     let info = try inspect(paths.staging)
                     try beforeRename()
                     try Self.moveExclusively(from: paths.staging, to: paths.final)
@@ -180,6 +181,27 @@ actor RecordingStore {
         }
         let loaded = try await history.load()
         return HistorySnapshot(entries: loaded.entries, warnings: warnings)
+    }
+
+    /// A crash leaves PCMRecordingWriter's header with size 0. Rebuild it from
+    /// the file length, cut to whole frames, without reading the audio.
+    private static func repairHeader(at url: URL) throws {
+        let handle = try FileHandle(forUpdating: url)
+        defer { try? handle.close() }
+        let size = try handle.seekToEnd()
+        guard size > 44, size - 44 <= UInt64(UInt32.max - 36) else { return }
+        try handle.seek(toOffset: 0)
+        let existing = try handle.read(upToCount: 44) ?? Data()
+        let dataBytes = (size - 44) / 2 * 2
+        let expected = PCMRecordingWriter.header(dataBytes: UInt32(dataBytes))
+        // Only the writer's own layout is repaired; any other file goes to inspect unchanged.
+        guard existing.count == 44, existing.prefix(4) == expected.prefix(4),
+              existing[8..<40] == expected[8..<40] else { return }
+        if dataBytes + 44 != size { try handle.truncate(atOffset: dataBytes + 44) }
+        guard existing != expected else { return }
+        try handle.seek(toOffset: 0)
+        try handle.write(contentsOf: expected)
+        try handle.synchronize()
     }
 
     private static func moveExclusively(from source: URL, to destination: URL) throws {
