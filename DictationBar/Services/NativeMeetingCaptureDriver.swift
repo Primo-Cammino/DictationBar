@@ -68,7 +68,7 @@ final class NativeMeetingCaptureDriver: CaptureDriving, @unchecked Sendable {
     func stop() {
         queue.async { [self] in
             guard !finished else { return }
-            if started { stopAll() } else { interrupted = true; finish(failedStart: true) }
+            if started { stopAll() } else { finish(failedStart: true) }
         }
     }
 
@@ -144,13 +144,14 @@ final class NativeMeetingCaptureDriver: CaptureDriving, @unchecked Sendable {
     private func receive(_ sampleBuffer: CMSampleBuffer, at hostTime: Double, from source: Source) {
         dispatchPrecondition(condition: .onQueue(queue))
         // Audio can arrive before the start acknowledgement.
-        guard !finished, states[source] == .starting || states[source] == .running, let writer else { return }
+        guard !finished, hostTime.isFinite, states[source] == .starting || states[source] == .running,
+              let writer else { return }
         do {
             guard let buffer = try PCMRecordingWriter.pcmBuffer(sampleBuffer) else { return }
             let mixer = self.mixer ?? MeetingMixer(startHostTime: hostTime)
             self.mixer = mixer
             try mixer.append(buffer, hostTime: hostTime, source: source)
-            if let mixed = mixer.mix(upTo: CMClockGetTime(CMClockGetHostTimeClock()).seconds) {
+            if let mixed = mixer.mix() {
                 try writer.append(mixed)
             }
         } catch {

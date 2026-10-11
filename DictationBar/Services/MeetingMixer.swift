@@ -50,10 +50,11 @@ final class MeetingMixer {
     }
 
     /// Mixes up to the point both sources reached. A source without data for
-    /// 0.5 s before `now` counts as silent, so it never holds back the other.
-    func mix(upTo now: Double) -> AVAudioPCMBuffer? {
-        let live = lanes.filter { now - $0.lastEnd <= Self.stallSeconds }
-        let frames = live.isEmpty ? lanes.map(\.pending.count).max()! : live.map(\.pending.count).min()!
+    /// 0.5 s behind the newest source counts as silent, so it never holds back the
+    /// other. Measured on data time, so a stalled capture queue drops nothing.
+    func mix() -> AVAudioPCMBuffer? {
+        let newest = lanes.map(\.lastEnd).max()!
+        let frames = lanes.filter { newest - $0.lastEnd <= Self.stallSeconds }.map(\.pending.count).min()!
         return output(frames)
     }
 

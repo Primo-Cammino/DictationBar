@@ -52,6 +52,24 @@ final class NativeMeetingCaptureDriverTests: XCTestCase {
         XCTAssertEqual(h.completions.count, 0)
     }
 
+    func testMicrophoneThatCannotBeOpenedFailsStartAndReleasesSystemAudio() async throws {
+        let h = try await MeetingDriverHarness(microphoneLookupFails: true); defer { h.fixture.cleanup() }
+        let starting = Task { try await h.service.startMeeting(microphoneID: "mic", paths: h.paths) }
+        try await expectStartFailure(starting)
+        try await wait { h.system.releases == 1 }
+        XCTAssertEqual(h.failedStarts, 1)
+        XCTAssertEqual(h.system.starts + h.microphone.starts, 0)
+        XCTAssertFalse(h.service.isActive)
+    }
+
+    func testMicrophoneStartErrorFailsStartAndStopsLateSystemAudio() async throws {
+        try await assertMicrophoneFailureDuringStart { $0.completeStart(CaptureFailure.start) }
+    }
+
+    func testMicrophoneEndingBeforeStartFailsStartAndStopsLateSystemAudio() async throws {
+        try await assertMicrophoneFailureDuringStart { $0.confirmStopped() }
+    }
+
     func testLostMicrophoneKeepsRecordingSystemAudio() async throws {
         let h = try await MeetingDriverHarness(); defer { h.fixture.cleanup() }
         try await h.start()
@@ -161,6 +179,27 @@ final class NativeMeetingCaptureDriverTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: h.paths.staging).count, 0)
     }
 
+    /// The microphone fails while system audio is still starting: the start fails,
+    /// the file is closed empty and a late system start is stopped right away.
+    private func assertMicrophoneFailureDuringStart(_ fail: (ControlledStream) -> Void) async throws {
+        let h = try await MeetingDriverHarness(); defer { h.fixture.cleanup() }
+        let starting = Task { try await h.service.startMeeting(microphoneID: "mic", paths: h.paths) }
+        try await wait { h.system.starts == 1 && h.microphone.starts == 1 }
+        fail(h.microphone)
+        try await expectStartFailure(starting)
+        XCTAssertEqual(h.failedStarts, 1)
+        XCTAssertEqual(h.microphone.releases, 1)
+        XCTAssertEqual(try Data(contentsOf: h.paths.staging).count, 44)
+        h.system.completeStart(nil)
+        try await wait { h.system.stops == 1 }
+        XCTAssertEqual(h.completions.count, 0)
+    }
+
+    private func expectStartFailure(_ starting: Task<Void, Error>) async throws {
+        do { try await starting.value; XCTFail("Expected start failure") }
+        catch { guard case CaptureFailure.start = error else { XCTFail("Expected start failure, got \(error)"); return } }
+    }
+
     private func wait(_ condition: () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(2)
         while !condition() {
@@ -228,7 +267,8 @@ private final class MeetingDriverHarness {
     var completions: [CaptureCompletion] { events.completions }
     var failedStarts: Int { events.failedStarts }
 
-    init(deadlineNanoseconds: UInt64 = 15_000_000_000, stopGrace: DispatchTimeInterval = .seconds(5)) async throws {
+    init(deadlineNanoseconds: UInt64 = 15_000_000_000, stopGrace: DispatchTimeInterval = .seconds(5),
+         microphoneLookupFails: Bool = false) async throws {
         fixture = try LocalStoreFixture()
         let entry = try fixture.entry()
         paths = try await RecordingStore(history: HistoryStore(supportURL: fixture.support))
@@ -240,6 +280,7 @@ private final class MeetingDriverHarness {
         service = RecordingService(deadlineNanoseconds: deadlineNanoseconds, makeMeetingDriver: { id, paths, event in
             NativeMeetingCaptureDriver(microphoneID: id, paths: paths, queue: queue, stopGrace: stopGrace,
                 makeStream: { source, _, sample, stopped in
+                    if source == .microphone && microphoneLookupFails { throw CaptureFailure.start }
                     let stream = source == .system ? system : microphone
                     stream.install(sample: sample, stopped: stopped)
                     return stream

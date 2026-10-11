@@ -13,7 +13,7 @@ final class MeetingMixerTests: XCTestCase {
             let offset = chunk * 4_800
             try mixer.append(buffer(frames: 4_800) { 0.5 * sine(440, offset + $0) }, hostTime: time, source: .system)
             try mixer.append(buffer(frames: 4_800) { 0.5 * sine(1_000, offset + $0) }, hostTime: time, source: .microphone)
-            out += samples(mixer.mix(upTo: time + 0.1))
+            out += samples(mixer.mix())
         }
         out += samples(mixer.finish())
         XCTAssertEqual(out.count, 48_000)
@@ -30,7 +30,7 @@ final class MeetingMixerTests: XCTestCase {
             if chunk != 3 && chunk != 4 {
                 try mixer.append(buffer(frames: 4_800) { _ in 0.5 }, hostTime: time, source: .microphone)
             }
-            out += samples(mixer.mix(upTo: time + 0.1))
+            out += samples(mixer.mix())
         }
         out += samples(mixer.finish())
         XCTAssertEqual(out.count, 48_000)
@@ -46,7 +46,7 @@ final class MeetingMixerTests: XCTestCase {
             let time = start + Double(chunk) * 0.1
             try mixer.append(buffer(frames: 4_800) { _ in 0.1 }, hostTime: time, source: .system)
             try mixer.append(buffer(rate: 16_000, frames: 1_600) { _ in 0.1 }, hostTime: time, source: .microphone)
-            out += samples(mixer.mix(upTo: time + 0.1))
+            out += samples(mixer.mix())
         }
         out += samples(mixer.finish())
         XCTAssertEqual(Double(out.count), 48_000, accuracy: 480)
@@ -58,11 +58,11 @@ final class MeetingMixerTests: XCTestCase {
         for chunk in 0..<3 {
             try mixer.append(buffer(frames: 4_800) { _ in 0.25 }, hostTime: start + Double(chunk) * 0.1, source: .system)
         }
-        XCTAssertTrue(samples(mixer.mix(upTo: start + 0.3)).isEmpty)
+        XCTAssertTrue(samples(mixer.mix()).isEmpty)
         for chunk in 3..<10 {
             try mixer.append(buffer(frames: 4_800) { _ in 0.25 }, hostTime: start + Double(chunk) * 0.1, source: .system)
         }
-        let out = samples(mixer.mix(upTo: start + 1.0))
+        let out = samples(mixer.mix())
         XCTAssertEqual(out.count, 48_000)
         XCTAssertEqual(out[40_000], 0.175, accuracy: 0.001)
     }
@@ -98,7 +98,7 @@ final class MeetingMixerTests: XCTestCase {
             let last = chunk == chunks - 1
             try mixer.append(buffer(frames: 4_800) { last && $0 == 0 ? 0.5 : 0 },
                              hostTime: start + Double(chunk) * microphoneChunk, source: .microphone)
-            collect(mixer.mix(upTo: time + 0.1))
+            collect(mixer.mix())
         }
         collect(mixer.finish())
         let expected = Int(((markerTime - start) * 48_000).rounded())

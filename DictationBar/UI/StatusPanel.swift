@@ -79,19 +79,21 @@ final class StatusPanel {
         guard visible else { panel.orderOut(nil); return }
         let size = host.fittingSize
         placing = true
+        defer { placing = false }
         if panel.isVisible {
             // Keep the bottom-left corner, so content grows upwards.
             panel.setFrame(NSRect(origin: panel.frame.origin, size: size), display: true)
         } else {
             let mouse = NSEvent.mouseLocation
             let screens = NSScreen.screens
-            let mouseScreen = screens.first { $0.frame.contains(mouse) } ?? NSScreen.main ?? screens[0]
+            // No display at all (mid reconfiguration): nothing to show the panel on.
+            guard let mouseScreen = screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main ?? screens.first
+            else { return }
             let origin = StatusPanelPlacement.origin(size: size, saved: saved, visibleFrames: screens.map(\.visibleFrame),
                                                      mouseScreen: mouseScreen.visibleFrame)
             panel.setFrame(NSRect(origin: origin, size: size), display: true)
             panel.orderFrontRegardless()
         }
-        placing = false
     }
 
     func close() { panel.close() }
