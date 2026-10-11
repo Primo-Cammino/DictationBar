@@ -55,5 +55,6 @@ Offen geblieben:
 
 ## Wünsche aus der Abnahme
 
-- Eigenes App-Symbol. Im Dock erscheint bisher das leere Standardsymbol.
-- Das Menüleisten-Symbol soll einen etwas dickeren, schwarzen Rahmen mit runden Ecken bekommen statt einer frei schwebenden Welle.
+Beide Wünsche sind umgesetzt (`3dca960`, `e0ae153`) und vom Nutzer bestätigt („passt super“):
+- App-Symbol im Dock: eine weiße Welle, mittig auf einem Verlauf von Himmelblau nach Mittelblau. Das Symbol wird zur Laufzeit gezeichnet; der Finder zeigt bis zu einem AppIcon-Asset-Katalog weiter das Standardsymbol.
+- Menüleiste: Die Welle steht in einem 2 pt dicken Rahmen mit runden Ecken, während einer Aufnahme ein Aufnahme-Punkt.
