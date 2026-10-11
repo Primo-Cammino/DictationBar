@@ -15,8 +15,25 @@ final class DictationModel {
     private(set) var actualMicrophoneID: String?
     private var requestedMicrophoneID: String?
     /// A meeting source that ended mid-recording; cleared when the meeting ends.
+    /// The status panel shows it beside, never instead of, the current notice.
     private(set) var missingSource: MeetingMixer.Source?
     var isMeeting: Bool { activeToken?.origin == .meeting }
+    /// Short message for the status panel; a newer one or a new activity replaces it.
+    private(set) var notice: PanelNotice?
+    private var meetingStartedAt: Date?
+
+    /// What the status panel shows as running. Derived from the operation, not from
+    /// `phase` alone, because a failed operation leaves `phase == .failed` behind.
+    var panelActivity: PanelActivity? {
+        guard let origin = activeToken?.origin else { return nil }
+        switch (origin, phase) {
+        case (.meeting, .preparing): return .meetingStarting
+        case (.meeting, .recording): return .meeting(since: meetingStartedAt ?? Date())
+        case (.meeting, _): return .meetingSaving
+        case (.liveDictation, .preparing), (.liveDictation, .recording): return .dictation
+        default: return .transcription
+        }
+    }
     var shortcut: DictationShortcut { configuration.shortcut ?? .default }
     var meetingShortcut: DictationShortcut { configuration.meetingShortcut ?? .meetingDefault }
     var preferredMicrophone: Microphone? {
@@ -66,6 +83,7 @@ final class DictationModel {
         activeToken = token
         insertionAttempted = false
         message = nil
+        notice = nil
         phase = origin == .historyRetry ? .transcribing : .preparing
         session = origin != .historyRetry
             ? DictationSession(id: id, createdAt: now, configuration: configuration, token: token)
@@ -134,6 +152,7 @@ final class DictationModel {
         services.recorder.onInterruption = { [weak self] in self?.stopRecording(reason: .interrupted) }
         services.recorder.onSourceLost = { [weak self] source in
             guard let self, self.isMeeting else { return }
+            if self.missingSource == nil { self.playCue(Self.warningCue) }
             self.missingSource = source
         }
         services.shortcuts.onToggle = { [weak self] in self?.toggleRecording() }
@@ -253,6 +272,18 @@ final class DictationModel {
         sound.volume = 0.5
         sound.play()
     }
+    private static let warningCue = "Basso"
+
+    private func post(_ kind: PanelNotice.Kind, _ text: String, entry: HistoryEntry? = nil) {
+        let notice = PanelNotice(kind: kind, text: text, entry: entry)
+        self.notice = notice
+        if kind == .interrupted { playCue(Self.warningCue) }
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(notice.seconds))
+            // An older timer never hides a newer notice.
+            if self?.notice?.id == notice.id { self?.notice = nil }
+        }
+    }
 
     func requestInsertionPermission() { services?.inserter.requestPermission() }
     func requestMicrophonePermission() async -> Bool { await services?.microphones.requestAccess() == true }
@@ -260,6 +291,7 @@ final class DictationModel {
     func toggleRecording() {
         if isMeeting {
             message = "Meeting läuft. Diktat ist währenddessen gesperrt."
+            post(.info, "Meeting läuft")
         } else if phase == .recording || phase == .preparing, isBusy {
             stopRecording(reason: .normal)
         } else if canStart, let token = begin(origin: .liveDictation) {
@@ -275,6 +307,7 @@ final class DictationModel {
             if phase == .recording { stopRecording(reason: .normal) }
         } else if let refusal = meetingRefusal {
             message = refusal
+            post(.info, refusal)
         } else if let token = begin(origin: .meeting) {
             stopReason = nil
             operationTask = Task { await executeLive(token) }
@@ -406,6 +439,7 @@ final class DictationModel {
             var visible = entry
             visible.status = .recording
             publish(visible)
+            meetingStartedAt = Date()
             transition(to: .recording, token: token)
             playCue("Tink")
             routeLiveMicrophone()
@@ -502,12 +536,14 @@ final class DictationModel {
                 preservation = .text(entry)
             }
         }
-        await finishOperation(token, error: detail)
+        await finishOperation(token, error: detail, errorKind: error is SystemAudioAccessFailure ? .permission : .error)
     }
 
-    private func finishOperation(_ token: OperationToken, error: String? = nil) async {
+    private func finishOperation(_ token: OperationToken, error: String? = nil,
+                                 errorKind: PanelNotice.Kind = .error) async {
         guard isCurrent(token) else { return }
-        let resultMessage: String? = if let entry = currentEntry, entry.isMeeting, entry.duration != nil {
+        let meetingEntry = currentEntry.flatMap { $0.isMeeting && $0.duration != nil ? $0 : nil }
+        let resultMessage: String? = if let entry = meetingEntry {
             entry.status == .interrupted ? "Meeting unterbrochen. Die Aufnahme bis dahin ist gespeichert." : "Meeting gespeichert."
         } else if currentEntry?.transcript == nil {
             currentEntry?.duration == nil ? nil : "WAV gespeichert. Transkription ist über die History möglich."
@@ -524,7 +560,14 @@ final class DictationModel {
         guard isCurrent(token) else { return }
         currentEntry = nil
         finish(token: token, error: error)
-        if error == nil { message = resultMessage }
+        if let error {
+            post(errorKind, error)
+        } else {
+            message = resultMessage
+            if let entry = meetingEntry, let resultMessage, !quitRequested {
+                post(entry.status == .interrupted ? .interrupted : .saved, resultMessage, entry: entry)
+            }
+        }
     }
 
     private func repairCheckpoint() async {
