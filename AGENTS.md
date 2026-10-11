@@ -47,4 +47,4 @@ eigenem Pfad unter `build/` erzeugen. Exit-Codes, Umgebung, Quellstand und echte
 Testanzahl festhalten. Xcode-Makros und XCTest können Ausführung außerhalb der
 Agent-Sandbox benötigen; das App-Projekt dafür nicht verändern.
 
-Aktueller Prüfbericht: `docs/validation/slice-1-local-2026-10-09.md`.
+Aktueller Prüfbericht: `docs/validation/meeting-recording-2026-10-11.md`.
