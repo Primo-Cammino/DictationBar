@@ -14,6 +14,9 @@ final class DictationModel {
     private(set) var message: String?
     private(set) var actualMicrophoneID: String?
     private var requestedMicrophoneID: String?
+    /// A meeting source that ended mid-recording; cleared when the meeting ends.
+    private(set) var missingSource: MeetingMixer.Source?
+    var isMeeting: Bool { activeToken?.origin == .meeting }
     var shortcut: DictationShortcut { configuration.shortcut ?? .default }
     var preferredMicrophone: Microphone? {
         MicrophoneRouting.preferred(microphones, configuredID: configuration.microphoneID,
@@ -97,6 +100,7 @@ final class DictationModel {
         phase = error == nil ? .idle : .failed
         actualMicrophoneID = nil
         requestedMicrophoneID = nil
+        missingSource = nil
     }
 
     func initialize() async {
@@ -126,6 +130,10 @@ final class DictationModel {
             self?.message = "Mikrofonwechsel fehlgeschlagen. Die bisherige Quelle bleibt aktiv, sofern sie verfügbar ist."
         }
         services.recorder.onInterruption = { [weak self] in self?.stopRecording(reason: .interrupted) }
+        services.recorder.onSourceLost = { [weak self] source in
+            guard let self, self.isMeeting else { return }
+            self.missingSource = source
+        }
         services.shortcuts.onToggle = { [weak self] in self?.toggleRecording() }
         services.shortcuts.onEscape = { [weak self] in self?.stopRecording(reason: .normal) }
         if profile == .production {
@@ -225,7 +233,9 @@ final class DictationModel {
     func requestMicrophonePermission() async -> Bool { await services?.microphones.requestAccess() == true }
 
     func toggleRecording() {
-        if phase == .recording || phase == .preparing, isBusy {
+        if isMeeting {
+            message = "Meeting läuft. Diktat ist währenddessen gesperrt."
+        } else if phase == .recording || phase == .preparing, isBusy {
             stopRecording(reason: .normal)
         } else if canStart, let token = begin(origin: .liveDictation) {
             stopReason = nil
@@ -233,9 +243,37 @@ final class DictationModel {
         }
     }
 
+    /// Starts a meeting only when nothing else runs and stops only a recording
+    /// meeting; a stop while it is still preparing is ignored (plan KTD7).
+    func toggleMeeting() {
+        if isMeeting {
+            if phase == .recording { stopRecording(reason: .normal) }
+        } else if let refusal = meetingRefusal {
+            message = refusal
+        } else if let token = begin(origin: .meeting) {
+            stopReason = nil
+            operationTask = Task { await executeLive(token) }
+        }
+    }
+
+    private var meetingRefusal: String? {
+        let reason: String? = if !initialized { "Die App startet noch." }
+            else if quitRequested { "Die App wird beendet." }
+            else if isBusy {
+                activeToken?.origin == .liveDictation && [.preparing, .recording].contains(phase)
+                    ? "Ein Diktat läuft." : "Eine Transkription läuft."
+            }
+            else if preservation != nil { "Eine Aufnahme ist noch nicht gesichert. Bitte zuerst die lokale Sicherung wiederholen." }
+            else if services?.recorder.isActive == true { CaptureFailure.busy.localizedDescription }
+            else { nil }
+        return reason.map { "Kein Meeting: " + $0 }
+    }
+
     func stopRecording(reason: RecordingStopReason) {
         guard isBusy, [.preparing, .recording, .saving].contains(phase) else { return }
-        if reason == .quit || stopReason == nil || reason == .interrupted { stopReason = reason }
+        // Quit beats a normal stop, which beats an interruption: a user stop is never an interruption.
+        let rank: [RecordingStopReason: Int] = [.interrupted: 0, .normal: 1, .quit: 2]
+        if stopReason.map({ rank[reason]! > rank[$0]! }) ?? true { stopReason = reason }
         if let stopSignal {
             self.stopSignal = nil
             stopSignal.resume(returning: stopReason ?? reason)
@@ -302,7 +340,7 @@ final class DictationModel {
 
     private func executeLive(_ token: OperationToken) async {
         guard let services, let snapshot = session?.configuration else { finish(token: token); return }
-        let meeting = token.origin == .browserRecording
+        let meeting = token.origin == .meeting
         currentEntry = nil
         do {
             guard snapshot.folderBookmark != nil else { throw LocalStoreError.missingFolder }
@@ -333,8 +371,11 @@ final class DictationModel {
                 return
             }
             preservation = .audio(entry)
-            do { try services.shortcuts.setCaptureActive(true) }
-            catch { shortcutMessage = Self.userMessage(error) }
+            // Escape stays free during meetings, e.g. to leave full screen in Zoom.
+            if !meeting {
+                do { try services.shortcuts.setCaptureActive(true) }
+                catch { shortcutMessage = Self.userMessage(error) }
+            }
             if meeting { try await services.recorder.startMeeting(microphoneID: microphoneID, paths: paths) }
             else { try await services.recorder.start(microphoneID: microphoneID, paths: paths) }
             var visible = entry
@@ -441,9 +482,13 @@ final class DictationModel {
 
     private func finishOperation(_ token: OperationToken, error: String? = nil) async {
         guard isCurrent(token) else { return }
-        let resultMessage = currentEntry?.transcript == nil
-            ? (currentEntry?.duration == nil ? nil : "WAV gespeichert. Transkription ist über die History möglich.")
-            : currentEntry?.insertion.title
+        let resultMessage: String? = if let entry = currentEntry, entry.isMeeting, entry.duration != nil {
+            entry.status == .interrupted ? "Meeting unterbrochen. Die Aufnahme bis dahin ist gespeichert." : "Meeting gespeichert."
+        } else if currentEntry?.transcript == nil {
+            currentEntry?.duration == nil ? nil : "WAV gespeichert. Transkription ist über die History möglich."
+        } else {
+            currentEntry?.insertion.title
+        }
         if let services {
             await services.history.revoke(token)
             if let snapshot = try? await services.history.load(), isCurrent(token) {

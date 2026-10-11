@@ -19,11 +19,17 @@ App-Verweis `DictationBar.app` im Projektordner führt dorthin.
 2. Aufnahmeordner und manuelles Mikrofon wählen. Bei aktivierter Bluetooth-Bevorzugung verwendet die App ein verfügbares Bluetooth-Mikrofon automatisch; ein Quellenverlust unterbricht die Aufnahme mit Sicherung.
 3. Eigenen Mistral-Key im geschützten Feld speichern. Der Key liegt in `~/Library/Application Support/DictationBar/mistral-api-key`, nur für den eigenen Benutzer lesbar (0600), und kann über die App geändert, entfernt und mit **Key bei Mistral prüfen** gegen Mistral getestet werden. Kein Schlüsselbund, keine Passwortabfrage. Den Key nicht in Chat, Quellcode oder Protokolle kopieren.
 4. **Mikrofon freigeben** und **Einfügen erlauben …** verwenden. Wenn macOS eine Einstellung verlangt, DictationBar dort freigeben; den angezeigten Hinweis beachten.
-5. Cursor in ein geeignetes Eingabefeld setzen. **Ctrl–Option–Leertaste** ist die Vorgabe. Unter **Einstellungen → Tastenkürzel → Tastenkürzel ändern** lässt sich beispielsweise **Option–R** einstellen. Das konfigurierte Kürzel startet; dasselbe Kürzel oder **Escape** beendet die Aufnahme normal. Start und Stop sind auch im Menü möglich.
+5. Cursor in ein geeignetes Eingabefeld setzen. **Ctrl–Option–Leertaste** ist die Vorgabe. Unter **Einstellungen → Tastenkürzel → Tastenkürzel ändern** lässt sich beispielsweise **Option–R** einstellen. Das konfigurierte Kürzel startet; dasselbe Kürzel oder **Escape** beendet das Diktat normal (Escape nur während eines Diktats, nicht während eines Meetings). Start und Stop sind auch im Menü möglich.
 
 Nach dem Stop sichert die App eine PCM16-Mono-WAV mit 48 kHz im gewählten Ordner. Anschließend sendet sie diese Aufnahme mit dem eigenen Key an Mistral (`voxtral-mini-latest`). Ein Ergebnis wird höchstens einmal per Cmd-V in das beim Abschluss geeignete fokussierte Feld eingefügt. Während der Verarbeitung startet kein zweiter Auftrag.
 
 Dieser Einfügeversuch nutzt die Zwischenablage nur kurz: Danach steht der vorherige Inhalt mit allen Formaten wieder darin, außer du hast in der Zwischenzeit selbst etwas kopiert. Das Transkript ist für Clipboard-Verläufe als flüchtig markiert. Sichere Felder, eigene App-Felder, nicht editierbare oder nicht verlässlich lesbare Felder werden abgewiesen. Mit echten Diktaten geprüft: TextEdit, Microsoft Edge (Adressleiste), Google Docs in Edge und iTerm; eine allgemeine Unterstützung aller Programme ist nicht nachgewiesen. Accessibility-Prüfung und Tastenevent sind auf macOS nicht atomar: ein Fokuswechsel unmittelbar nach der letzten Prüfung bleibt eine zeitliche Grenze.
+
+## Meeting aufnehmen
+
+**Meeting starten** in der App-Ansicht nimmt den Systemton aller Apps (Teams, Zoom, Browser) und das fürs Diktat gewählte Mikrofon gemischt in eine Mono-WAV auf, ohne Zeitlimit. Beim ersten Meeting fragt macOS nach der Freigabe unter **Datenschutz & Sicherheit › Bildschirm- & Systemaudioaufnahme**. Gestoppt wird nur über **Meeting stoppen**; **Escape** bleibt während eines Meetings für andere Apps frei, und das Diktat-Kürzel ist gesperrt. Kopfhörer tragen, sonst landen die anderen Stimmen doppelt in der Datei.
+
+Nach dem Stopp liegt die Datei `Meeting-….wav` in der History. Sie wird nicht transkribiert und nicht hochgeladen; über **Im Finder zeigen** lässt sie sich manuell in Mistral Audio Studio hochladen, das die Sprecher trennt. Fällt während des Meetings eine Quelle aus, etwa das Headset, läuft die Aufnahme mit der anderen weiter.
 
 ## History, Fehler und Beenden
 

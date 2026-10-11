@@ -3,7 +3,7 @@ import Foundation
 enum OperationOrigin: String, Codable {
     case liveDictation
     case historyRetry
-    case browserRecording
+    case meeting
 }
 
 enum RecordingStopReason: String, Codable {

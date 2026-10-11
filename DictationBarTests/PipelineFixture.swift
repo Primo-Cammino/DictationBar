@@ -51,6 +51,7 @@ final class PipelineFixture {
 
     func start() async throws { model.toggleRecording(); try await wait { model.phase == .recording } }
     func stop() { model.toggleRecording() }
+    func startMeeting() async throws { model.toggleMeeting(); try await wait { model.phase == .recording } }
 }
 
 @MainActor
@@ -76,6 +77,7 @@ final class PipelineRecorder: RecordingProviding {
     var onInterruption: (() -> Void)?
     var onMicrophoneChanged: ((String) -> Void)?
     var onMicrophoneSwitchFailed: (() -> Void)?
+    var onSourceLost: ((MeetingMixer.Source) -> Void)?
     var switchFails = false
     var switches: [String] = []
     func switchMicrophone(to id: String) {
