@@ -13,10 +13,17 @@ final class PipelineFixture {
     let shortcuts = PipelineShortcuts()
     let browser = PipelineBrowserMonitor()
 
+    /// `existing` entries are journaled with a valid WAV before the model starts.
     init(profile: RuntimeProfile = .testing, shortcutRegistrationFails: Bool = false,
-         beforeWrite: @escaping () throws -> Void = {}) async throws {
+         beforeWrite: @escaping () throws -> Void = {},
+         existing: (LocalStoreFixture) throws -> [HistoryEntry] = { _ in [] }) async throws {
         files = try LocalStoreFixture()
         history = HistoryStore(supportURL: files.support, beforeWrite: beforeWrite)
+        for entry in try existing(files) {
+            let token = files.token(entry)
+            await history.authorize(token); try await history.create(entry, token: token); await history.revoke(token)
+            try LocalStoreFixture.wav().write(to: files.folder.appendingPathComponent(entry.filename))
+        }
         let folders = FolderStore(supportURL: files.support)
         try await folders.save(AppConfiguration(microphoneID: "selected", folderBookmark: FolderStore.bookmark(for: files.folder)))
         let services = DictationServices(folders: folders, history: history, recordings: RecordingStore(history: history),

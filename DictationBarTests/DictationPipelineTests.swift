@@ -117,4 +117,24 @@ final class DictationPipelineTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testMeetingEntryIsNeverRetriedWhileOldBrowserEntryStaysTranscribable() async throws {
+        var browserID = UUID(), meetingID = UUID()
+        let f = try await PipelineFixture(existing: { files in
+            var browser = try files.entry(date: Date(timeIntervalSince1970: 100))
+            browser.sourceLabel = "Safari · Browser-Audio"
+            let meeting = HistoryEntry(id: UUID(), createdAt: Date(timeIntervalSince1970: 200), microphoneID: "selected",
+                                       folderBookmark: try FolderStore.bookmark(for: files.folder), kind: .meeting)
+            browserID = browser.id; meetingID = meeting.id
+            return [browser, meeting]
+        }); defer { f.files.cleanup() }
+        XCTAssertEqual(f.model.history.count, 2)
+        f.model.retry(meetingID)
+        XCTAssertFalse(f.model.isBusy)
+        f.model.retry(browserID)
+        try await f.wait { !f.model.isBusy }
+        XCTAssertEqual(f.transcriber.calls, 1)
+        XCTAssertNotNil(f.model.history.first { $0.id == browserID }?.transcript)
+        XCTAssertNil(f.model.history.first { $0.id == meetingID }?.transcript)
+    }
 }

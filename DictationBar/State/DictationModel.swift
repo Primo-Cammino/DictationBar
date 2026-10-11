@@ -288,7 +288,7 @@ final class DictationModel {
 
     func retry(_ id: UUID) {
         guard canStart, let entry = history.first(where: { $0.id == id }), entry.transcript == nil,
-              let token = begin(origin: .historyRetry, id: id) else { return }
+              !entry.isMeeting, let token = begin(origin: .historyRetry, id: id) else { return }
         operationTask = Task {
             guard let services else { finish(token: token); return }
             do {

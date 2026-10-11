@@ -109,8 +109,8 @@ actor HistoryStore {
               abs(entry.createdAt.timeIntervalSince1970) < Double(Int64.max) / 1_000 else {
             throw LocalStoreError.invalidRecord
         }
-        let expected = HistoryEntry(id: entry.id, createdAt: entry.createdAt,
-                                   microphoneID: entry.microphoneID, folderBookmark: entry.folderBookmark)
+        let expected = HistoryEntry(id: entry.id, createdAt: entry.createdAt, microphoneID: entry.microphoneID,
+                                   folderBookmark: entry.folderBookmark, kind: entry.kind)
         guard entry.filename == expected.filename, entry.stagingFilename == expected.stagingFilename else {
             throw LocalStoreError.invalidRecord
         }

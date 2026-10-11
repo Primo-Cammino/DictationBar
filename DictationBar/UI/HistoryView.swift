@@ -10,9 +10,9 @@ struct HistoryView: View {
         Group {
             if dictation.history.isEmpty && dictation.historyWarnings.isEmpty {
                 ContentUnavailableView {
-                    Label("Noch keine Diktate", systemImage: "waveform")
+                    Label("Noch keine Aufnahmen", systemImage: "waveform")
                 } description: {
-                    Text("Richte Mikrofon, Ordner und Mistral-Key in den Einstellungen ein. Dann in ein Textfeld klicken und \(dictation.shortcut.displayName) drücken. Jedes Diktat landet hier, auch wenn das Einfügen nicht klappt.")
+                    Text("Richte Mikrofon, Ordner und Mistral-Key in den Einstellungen ein. Dann in ein Textfeld klicken und \(dictation.shortcut.displayName) drücken. Jede Aufnahme landet hier, auch wenn das Einfügen nicht klappt.")
                 }
             } else {
                 List {
@@ -85,14 +85,14 @@ private struct HistoryRow: View {
             } else {
                 status
             }
-            if let message = entry.message {
+            if let message = entry.visibleMessage {
                 Text(message).font(.callout).foregroundStyle(.secondary)
             }
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 metadata
                 Spacer(minLength: 12)
                 action
-                Button("Im Finder zeigen", systemImage: "folder", action: revealInFinder)
+                Button("Im Finder zeigen", systemImage: "folder", action: entry.revealInFinder)
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .help("Aufnahme im Finder zeigen")
@@ -104,25 +104,21 @@ private struct HistoryRow: View {
         .contextMenu {
             if entry.transcript != nil {
                 Button("Kopieren", systemImage: "doc.on.doc", action: copy)
-            } else if entry.status != .transcribing {
+            } else if entry.status != .transcribing, !entry.isMeeting {
                 Button("Erneut transkribieren", systemImage: "arrow.clockwise", action: retry).disabled(!canRetry)
             }
-            Button("Im Finder zeigen", systemImage: "folder", action: revealInFinder)
-        }
-    }
-
-    private func revealInFinder() {
-        guard let folder = try? FolderStore.resolve(entry.folderBookmark).url else { return }
-        let file = folder.appendingPathComponent(entry.filename)
-        if FileManager.default.fileExists(atPath: file.path) {
-            NSWorkspace.shared.activateFileViewerSelecting([file])
-        } else {
-            NSWorkspace.shared.open(folder)
+            Button("Im Finder zeigen", systemImage: "folder", action: entry.revealInFinder)
         }
     }
 
     @ViewBuilder private var status: some View {
         switch entry.status {
+        case .preparing where entry.isMeeting, .recording where entry.isMeeting:
+            statusLabel("Meeting läuft", symbol: "record.circle", tint: .red)
+        case .failed where entry.isMeeting:
+            statusLabel("Meeting nicht gespeichert", symbol: "xmark.octagon.fill", tint: .red)
+        case _ where entry.isMeeting:
+            statusLabel("Meeting gespeichert", symbol: "person.2.wave.2", tint: .secondary)
         case .transcribing:
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
@@ -186,7 +182,7 @@ private struct HistoryRow: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.borderless)
-        } else if entry.status != .transcribing {
+        } else if entry.status != .transcribing, !entry.isMeeting {
             Button(entry.sourceLabel != nil && entry.status == .pending ? "Transkribieren" : "Erneut transkribieren",
                    systemImage: "arrow.clockwise", action: retry)
                 .buttonStyle(.borderless)
@@ -198,5 +194,18 @@ private struct HistoryRow: View {
         duration < 60
             ? duration.formatted(.number.precision(.fractionLength(1))) + " s"
             : Duration.seconds(duration).formatted(.time(pattern: .minuteSecond)) + " min"
+    }
+}
+
+extension HistoryEntry {
+    /// Selects the WAV in Finder, or opens its folder when the file is gone.
+    @MainActor func revealInFinder() {
+        guard let folder = try? FolderStore.resolve(folderBookmark).url else { return }
+        let file = folder.appendingPathComponent(filename)
+        if FileManager.default.fileExists(atPath: file.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([file])
+        } else {
+            NSWorkspace.shared.open(folder)
+        }
     }
 }

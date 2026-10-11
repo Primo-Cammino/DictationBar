@@ -31,6 +31,9 @@ enum InsertionStatus: String, Codable {
 }
 
 struct HistoryEntry: Codable, Equatable, Identifiable {
+    /// Missing in dictations and in journals written before meetings existed.
+    enum Kind: String, Codable { case meeting }
+
     var schemaVersion = 1
     let id: UUID
     let createdAt: Date
@@ -42,19 +45,26 @@ struct HistoryEntry: Codable, Equatable, Identifiable {
     /// Missing markers in earlier journals are treated conservatively.
     var stagingOwned: Bool? = false
     var sourceLabel: String?
+    let kind: Kind?
     var duration: TimeInterval?
     var status: HistoryStatus = .preparing
     var transcript: String?
     var insertion: InsertionStatus = .notAttempted
     var message: String?
 
-    init(id: UUID, createdAt: Date, microphoneID: String, folderBookmark: Data) {
+    var isMeeting: Bool { kind == .meeting }
+    /// Meetings are uploaded elsewhere, so transcription hints stay hidden; a failure still explains itself.
+    var visibleMessage: String? { isMeeting && status != .failed ? nil : message }
+
+    init(id: UUID, createdAt: Date, microphoneID: String, folderBookmark: Data, kind: Kind? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.microphoneID = microphoneID
         self.folderBookmark = folderBookmark
+        self.kind = kind
         let stamp = Int(createdAt.timeIntervalSince1970 * 1_000)
-        filename = "Dictation-\(stamp)-\(id.uuidString).wav"
-        stagingFilename = ".Dictation-\(stamp)-\(id.uuidString).recording.wav"
+        let prefix = kind == .meeting ? "Meeting" : "Dictation"
+        filename = "\(prefix)-\(stamp)-\(id.uuidString).wav"
+        stagingFilename = ".\(prefix)-\(stamp)-\(id.uuidString).recording.wav"
     }
 }
