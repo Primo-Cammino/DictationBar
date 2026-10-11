@@ -78,11 +78,18 @@ Signaturanforderung der installierten App:
   Text erschien; das Transkript wurde danach eingefügt, ohne die Zwischenablage zu überschreiben. Vom Nutzer
   abgenommen („passt erstmal soweit, finde ich super gut“).
 
+## Bluetooth-Abnahme (Huawei FreeBuds, 11.10.2026, vom Nutzer bedient)
+
+- **BA2 bestanden:** Nach dem Verbinden wählte die App die FreeBuds automatisch als Quelle; Diktat kam an.
+- **BA3 bestanden:** Aufnahme startete mit MacBook-Mikrofon, FreeBuds wurden während der Aufnahme verbunden,
+  der vollständige Text aus beiden Abschnitten kam an.
+- **Geräteverlust bestanden:** FreeBuds während der Aufnahme getrennt → Aufnahme abgebrochen, kein stiller
+  Rückfall. History-Eintrag `status: interrupted`, `duration: 11.26`, erneut transkribierbar.
+
 ## Noch offen
 
 - Einfügen in Safari (vom Nutzer nicht benötigt); Toggle und Escape bei Fremd-App-Fokus.
 - Kein geeignetes Ziel / Fokuswechsel mit Kopieren aus der History; History-Retry ohne Paste.
 - Beenden während Aufnahme und HTTP; bewusste Wiederaufnahme.
 - Browser-Hinweis, Systemaudio-Freigabe und hörbare Browser-Aufnahme.
-- Bluetooth-Headset mit sofortigem Wechsel während der Aufnahme.
 - „Key bei Mistral prüfen“ mit echtem Key nicht separat gesichtet (Transkription mit Datei-Key belegt).
