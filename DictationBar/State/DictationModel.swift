@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -256,6 +257,14 @@ final class DictationModel {
         catch { message = Self.userMessage(error) }
     }
 
+    /// Start/stop feedback with macOS system sounds; silent in tests.
+    // ponytail: fixed sounds and volume, add a setting if someone wants them off or different.
+    private func playCue(_ name: String) {
+        guard profile == .production, let sound = NSSound(named: name) else { return }
+        sound.volume = 0.5
+        sound.play()
+    }
+
     func requestInsertionPermission() { services?.inserter.requestPermission() }
     func requestMicrophonePermission() async -> Bool { await services?.microphones.requestAccess() == true }
 
@@ -379,8 +388,10 @@ final class DictationModel {
             visible.status = .recording
             publish(visible)
             transition(to: .recording, token: token)
+            playCue("Tink")
             routeLiveMicrophone()
             let reason = await waitForStop()
+            playCue("Bottle")
             try? services.shortcuts.setCaptureActive(false)
             transition(to: .saving, token: token)
             let completion = try await services.recorder.stop()

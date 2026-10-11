@@ -80,7 +80,7 @@ struct SettingsView: View {
                 Text(dictation.insertionPermissionSummary)
                     .font(.callout).foregroundStyle(.secondary)
                 Button("Einfügen erlauben …") { dictation.requestInsertionPermission() }
-                Text("Ohne geeignetes Eingabefeld bleibt der Text in der History. Automatisches Einfügen ersetzt die Zwischenablage.")
+                Text("Ohne geeignetes Eingabefeld bleibt der Text in der History. Nach dem Einfügen steht wieder dein vorheriger Inhalt in der Zwischenablage.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 

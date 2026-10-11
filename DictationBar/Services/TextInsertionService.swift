@@ -27,6 +27,8 @@ protocol TextInsertionEnvironment {
     var clipboardRevision: Int { get }
     func focusedTarget(deadline: TimeInterval) async -> FocusedTextTarget?
     func setClipboard(_ text: String) -> Int?
+    /// Puts back what `setClipboard` replaced, unless the clipboard changed since `revision`.
+    func restoreClipboard(ifUnchangedSince revision: Int)
     func postPaste() -> Bool
     func requestPermission()
 }
@@ -52,15 +54,17 @@ final class TextInsertionService: TextInsertionProviding {
     private let environment: any TextInsertionEnvironment
     private let now: () -> TimeInterval
     private let readbackDelay: UInt64
+    private let restoreDelay: UInt64
     var isPermitted: Bool { environment.isPermitted }
     var permissionSummary: String { environment.permissionSummary }
 
     init(environment: any TextInsertionEnvironment,
          now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-         readbackDelay: UInt64 = 100_000_000) {
+         readbackDelay: UInt64 = 100_000_000, restoreDelay: UInt64 = 250_000_000) {
         self.environment = environment
         self.now = now
         self.readbackDelay = readbackDelay
+        self.restoreDelay = restoreDelay
     }
 
     func requestPermission() { environment.requestPermission() }
@@ -74,9 +78,26 @@ final class TextInsertionService: TextInsertionProviding {
         guard let revision = environment.setClipboard(text) else { return .unavailable }
         guard let current = await environment.focusedTarget(deadline: deadline), current == target,
               environment.clipboardRevision == revision, now() < deadline,
-              isCurrent(), environment.isPermitted else { return .unconfirmed }
-        guard environment.postPaste() else { return .unconfirmed }
-        // Readback never sends a second paste, even when acknowledgement is slow.
+              isCurrent(), environment.isPermitted, environment.postPaste() else {
+            environment.restoreClipboard(ifUnchangedSince: revision)
+            return .unconfirmed
+        }
+        // The target reads the clipboard while handling ⌘V. Restore shortly after, in parallel to the
+        // readback: terminals and web apps never confirm, and the user may press ⌘V right away.
+        async let restored: Void = restoreClipboard(after: restoreDelay, ifUnchangedSince: revision)
+        let status = await readback(text, into: target, expecting: expected, deadline: deadline, isCurrent: isCurrent)
+        await restored
+        return status
+    }
+
+    private func restoreClipboard(after delay: UInt64, ifUnchangedSince revision: Int) async {
+        try? await Task.sleep(nanoseconds: delay)
+        environment.restoreClipboard(ifUnchangedSince: revision)
+    }
+
+    /// Readback never sends a second paste, even when acknowledgement is slow.
+    private func readback(_ text: String, into target: FocusedTextTarget, expecting expected: String,
+                          deadline: TimeInterval, isCurrent: @MainActor () -> Bool) async -> InsertionStatus {
         for _ in 0..<6 {
             try? await Task.sleep(nanoseconds: readbackDelay)
             guard now() < deadline, isCurrent(),

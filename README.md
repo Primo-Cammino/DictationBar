@@ -23,7 +23,7 @@ App-Verweis `DictationBar.app` im Projektordner führt dorthin.
 
 Nach dem Stop sichert die App eine PCM16-Mono-WAV mit 48 kHz im gewählten Ordner. Anschließend sendet sie diese Aufnahme mit dem eigenen Key an Mistral (`voxtral-mini-latest`). Ein Ergebnis wird höchstens einmal per Cmd-V in das beim Abschluss geeignete fokussierte Feld eingefügt. Während der Verarbeitung startet kein zweiter Auftrag.
 
-Dieser Einfügeversuch ersetzt die Zwischenablage durch das Transkript; sie wird anschließend nicht zurückgesetzt. Sichere Felder, eigene App-Felder, nicht editierbare oder nicht verlässlich lesbare Felder werden abgewiesen. TextEdit und Safari müssen noch mit echten Diktaten geprüft werden; eine allgemeine Unterstützung aller Programme ist nicht nachgewiesen. Accessibility-Prüfung und Tastenevent sind auf macOS nicht atomar: ein Fokuswechsel unmittelbar nach der letzten Prüfung bleibt eine zeitliche Grenze.
+Dieser Einfügeversuch nutzt die Zwischenablage nur kurz: Danach steht der vorherige Inhalt mit allen Formaten wieder darin, außer du hast in der Zwischenzeit selbst etwas kopiert. Das Transkript ist für Clipboard-Verläufe als flüchtig markiert. Sichere Felder, eigene App-Felder, nicht editierbare oder nicht verlässlich lesbare Felder werden abgewiesen. Mit echten Diktaten geprüft: TextEdit, Microsoft Edge (Adressleiste), Google Docs in Edge und iTerm; eine allgemeine Unterstützung aller Programme ist nicht nachgewiesen. Accessibility-Prüfung und Tastenevent sind auf macOS nicht atomar: ein Fokuswechsel unmittelbar nach der letzten Prüfung bleibt eine zeitliche Grenze.
 
 ## History, Fehler und Beenden
 

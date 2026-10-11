@@ -3,7 +3,7 @@ import XCTest
 
 final class TextInsertionTests: XCTestCase {
     @MainActor
-    func testCurrentTargetSelectionWithUnicodeGetsOneConfirmedPasteAndRetainsClipboard() async {
+    func testCurrentTargetSelectionWithUnicodeGetsOneConfirmedPasteAndRestoresClipboard() async {
         let environment = InsertionFake()
         environment.target = environment.makeTarget(value: "vor 🌱 nach", selection: NSRange(location: 4, length: 2))
         let service = TextInsertionService(environment: environment, readbackDelay: 0)
@@ -11,7 +11,7 @@ final class TextInsertionTests: XCTestCase {
         XCTAssertEqual(status, .confirmed)
         XCTAssertEqual(environment.target?.value, "vor Grüße nach")
         XCTAssertEqual(environment.pastes, 1)
-        XCTAssertEqual(environment.clipboard, "Grüße")
+        XCTAssertEqual(environment.clipboard, "previous")
     }
 
     @MainActor
@@ -44,6 +44,7 @@ final class TextInsertionTests: XCTestCase {
         let result = await TextInsertionService(environment: environment, readbackDelay: 0).insert("Text", isCurrent: { true })
         XCTAssertEqual(result, .unconfirmed)
         XCTAssertEqual(environment.pastes, 0)
+        XCTAssertEqual(environment.clipboard, "previous")
         let changedClipboard = InsertionFake()
         changedClipboard.onRead = { count in
             if count == 2 { changedClipboard.clipboard = "foreign change"; changedClipboard.clipboardRevision += 1 }
@@ -75,10 +76,34 @@ final class TextInsertionTests: XCTestCase {
     func testReadbackMismatchNeverRepeatsPasteOrClaimsSuccess() async {
         let environment = InsertionFake()
         environment.confirms = false
-        let result = await TextInsertionService(environment: environment, readbackDelay: 0).insert("Text", isCurrent: { true })
+        let result = await TextInsertionService(environment: environment, readbackDelay: 0, restoreDelay: 0)
+            .insert("Text", isCurrent: { true })
         XCTAssertEqual(result, .unconfirmed)
         XCTAssertEqual(environment.pastes, 1)
-        XCTAssertEqual(environment.clipboard, "Text")
+        XCTAssertEqual(environment.clipboard, "previous")
+    }
+
+    @MainActor
+    func testClipboardIsRestoredWhileUnconfirmedReadbackStillRuns() async {
+        let environment = InsertionFake()
+        environment.confirms = false
+        var duringLastReadback: String?
+        environment.onRead = { count in if count == 8 { duringLastReadback = environment.clipboard } }
+        _ = await TextInsertionService(environment: environment, readbackDelay: 10_000_000, restoreDelay: 0)
+            .insert("Text", isCurrent: { true })
+        XCTAssertEqual(duringLastReadback, "previous")
+    }
+
+    @MainActor
+    func testClipboardCopiedByUserDuringReadbackIsNotOverwritten() async {
+        let environment = InsertionFake()
+        environment.confirms = false
+        environment.onRead = { count in
+            if count == 3 { environment.clipboard = "user copy"; environment.clipboardRevision += 1 }
+        }
+        _ = await TextInsertionService(environment: environment, readbackDelay: 0, restoreDelay: 0)
+            .insert("Text", isCurrent: { true })
+        XCTAssertEqual(environment.clipboard, "user copy")
     }
 }
 
@@ -104,7 +129,14 @@ private final class InsertionFake: TextInsertionEnvironment {
     func focusedTarget(deadline: TimeInterval) async -> FocusedTextTarget? {
         reads += 1; onRead?(reads); return target
     }
-    func setClipboard(_ text: String) -> Int? { clipboard = text; clipboardRevision += 1; return clipboardRevision }
+    private var saved: String?
+    func setClipboard(_ text: String) -> Int? { saved = clipboard; clipboard = text; clipboardRevision += 1; return clipboardRevision }
+    func restoreClipboard(ifUnchangedSince revision: Int) {
+        defer { saved = nil }
+        guard clipboardRevision == revision, let saved else { return }
+        clipboard = saved
+        clipboardRevision += 1
+    }
     func postPaste() -> Bool {
         pastes += 1
         if confirms, let target, let expected = target.expectedValue(inserting: clipboard, ownProcessID: ownProcessID) {

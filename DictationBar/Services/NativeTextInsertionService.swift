@@ -10,6 +10,7 @@ private let insertionLog = Logger(subsystem: "com.primocammino.DictationBar", ca
 final class NativeTextInsertionEnvironment: TextInsertionEnvironment {
     private let reader = AXTargetReader()
     private var latestTarget: FocusedTextTarget?
+    private var savedClipboard: [NSPasteboardItem] = []
     var ownProcessID: Int32 { ProcessInfo.processInfo.processIdentifier }
     var clipboardRevision: Int { NSPasteboard.general.changeCount }
     var isPermitted: Bool { AXIsProcessTrusted() && CGPreflightPostEventAccess() }
@@ -29,12 +30,31 @@ final class NativeTextInsertionEnvironment: TextInsertionEnvironment {
 
     func setClipboard(_ text: String) -> Int? {
         let pasteboard = NSPasteboard.general
+        savedClipboard = (pasteboard.pasteboardItems ?? []).map { item in
+            let copy = NSPasteboardItem()
+            for type in item.types { if let data = item.data(forType: type) { copy.setData(data, forType: type) } }
+            return copy
+        }
         pasteboard.clearContents()
-        guard pasteboard.setString(text, forType: .string) else {
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        // Clipboard managers (Raycast, Alfred, …) skip transient items, so the transcript stays out of their history.
+        item.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.TransientType"))
+        guard pasteboard.writeObjects([item]) else {
             insertionLog.notice("Zwischenablage konnte nicht geschrieben werden")
+            restoreClipboard(ifUnchangedSince: pasteboard.changeCount)
             return nil
         }
         return pasteboard.changeCount
+    }
+
+    func restoreClipboard(ifUnchangedSince revision: Int) {
+        let pasteboard = NSPasteboard.general
+        defer { savedClipboard = [] }
+        // Someone copied something new meanwhile: theirs wins.
+        guard pasteboard.changeCount == revision else { return }
+        pasteboard.clearContents()
+        if !savedClipboard.isEmpty { pasteboard.writeObjects(savedClipboard) }
     }
 
     func postPaste() -> Bool {

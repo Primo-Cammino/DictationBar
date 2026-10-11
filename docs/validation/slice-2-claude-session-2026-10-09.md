@@ -62,6 +62,22 @@ Signaturanforderung der installierten App:
 - Einfügen vom Nutzer bestätigt in: Microsoft Edge (Adressleiste, Screenshot), Google Docs in Edge,
   iTerm. Edge ersetzt auf Nutzerwunsch Safari als geprüften Browser.
 
+## Nachtrag: Töne und Zwischenablage (PRD Abschnitt 12)
+
+- Start-/Endton (`Tink`/`Bottle`, Lautstärke 0,5) beim tatsächlichen Aufnahmestart und -ende, nur im Produktivprofil.
+- Einfügen sichert alle Zwischenablage-Formate vorher und stellt sie 0,25 s nach dem ⌘V wieder her,
+  parallel zur Readback-Kontrolle. Hat der Nutzer inzwischen kopiert, bleibt dessen Inhalt. Transkript als
+  `org.nspasteboard.TransientType` markiert.
+- Erster Nutzertest (iTerm): Töne bestätigt („reichen total“). Zwischenablage kam zurück, aber zu spät:
+  das erste ⌘V fügte noch das Transkript ein. Ursache: Terminal, Edge und Docs bestätigen nie
+  (`insertion: unconfirmed` in der History), und die Wiederherstellung lief erst nach Readback (0,6 s) plus 0,5 s.
+- Korrektur: Wiederherstellung nach 0,25 s parallel zum Readback; Test
+  `testClipboardIsRestoredWhileUnconfirmedReadbackStillRuns`. Lauf `claude-clipboard-timing-test-1`: Exit 0,
+  108/108, 0 Swift-Warnungen. Release installiert (vorherige App unter `.local-backups/app-install-a2w9rae2/`).
+  Zweiter Nutzertest (iTerm, 10.10.2026): Text kopiert, diktiert, gestoppt, sofort ⌘V → der eigene kopierte
+  Text erschien; das Transkript wurde danach eingefügt, ohne die Zwischenablage zu überschreiben. Vom Nutzer
+  abgenommen („passt erstmal soweit, finde ich super gut“).
+
 ## Noch offen
 
 - Einfügen in Safari (vom Nutzer nicht benötigt); Toggle und Escape bei Fremd-App-Fokus.
