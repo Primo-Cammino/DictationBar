@@ -1,10 +1,10 @@
 import AVFoundation
 
 /// Mixes system audio and microphone onto one host-time axis and returns a
-/// limited mono sum in Float32 48 kHz for PCMRecordingWriter (plan KTD3).
+/// limited mono sum in Float32 48 kHz for PCMRecordingWriter.
 /// Not thread-safe: the meeting driver calls it on its serial queue.
 final class MeetingMixer {
-    enum Source: Int { case system, microphone }
+    enum Source: Int, CaseIterable { case system, microphone }
 
     // ponytail: fixed tolerances from the plan; tune after real one-hour recordings.
     private static let rate = 48_000.0
@@ -28,7 +28,7 @@ final class MeetingMixer {
 
     init(startHostTime: Double) {
         start = startHostTime
-        lanes = [Lane(lastEnd: startHostTime), Lane(lastEnd: startHostTime)]
+        lanes = Source.allCases.map { _ in Lane(lastEnd: startHostTime) }
     }
 
     /// Places `buffer` (any PCM format) at `hostTime`, in host-clock seconds.
@@ -91,12 +91,13 @@ final class MeetingMixer {
         }
         guard let converter = lane.converter else { throw PCMRecordingWriterError.conversion }
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * Self.rate / buffer.format.sampleRate) + 64
+        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else {
+            throw PCMRecordingWriterError.conversion
+        }
         var result: [Float] = []
         var supplied = false
         while true {
-            guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else {
-                throw PCMRecordingWriterError.conversion
-            }
+            output.frameLength = 0
             var error: NSError?
             let status = converter.convert(to: output, error: &error) { _, inputStatus in
                 if supplied { inputStatus.pointee = .noDataNow; return nil }

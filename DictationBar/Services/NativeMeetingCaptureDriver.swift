@@ -2,8 +2,8 @@
 @preconcurrency import CoreMedia
 import Foundation
 
-/// One meeting recording: system audio and microphone, mixed into one WAV
-/// (plan KTD4). Start succeeds for both sources or for neither. Losing one
+/// One meeting recording: system audio and microphone, mixed into one WAV.
+/// Start succeeds for both sources or for neither. Losing one
 /// source keeps the recording going; losing both or a write error ends it as
 /// interrupted. Late start/stop/sample callbacks cannot revive a finished driver.
 // All mutable state is confined to queue. Stream factories run off-queue and
@@ -13,7 +13,7 @@ final class NativeMeetingCaptureDriver: CaptureDriving, @unchecked Sendable {
     typealias StreamFactory = (Source, DispatchQueue, @escaping CaptureSampleHandler,
                                @escaping (Error) -> Void) async throws -> any CaptureStreaming
     private enum State { case starting, running, stopping, ended }
-    private static let sources: [Source] = [.system, .microphone]
+    private static let sources = Source.allCases
 
     private let queue: DispatchQueue
     private let makeStream: StreamFactory
@@ -87,8 +87,7 @@ final class NativeMeetingCaptureDriver: CaptureDriving, @unchecked Sendable {
         guard !finished else {
             // The meeting already ended; never leave a late-starting capture running.
             streams[source] = nil
-            if error == nil { stream.stop { [queue] _ in queue.async { stream.detachOutputs() } } }
-            else { stream.detachOutputs() }
+            if error == nil { stopAndDetach(stream) } else { stream.detachOutputs() }
             return
         }
         guard error == nil else { states[source] = .ended; finish(failedStart: true); return }
@@ -175,6 +174,10 @@ final class NativeMeetingCaptureDriver: CaptureDriving, @unchecked Sendable {
         else { event(.finished(CaptureCompletion(interrupted: failed))) }
     }
 
+    private func stopAndDetach(_ stream: any CaptureStreaming) {
+        stream.stop { [queue] _ in queue.async { stream.detachOutputs() } }
+    }
+
     private func release(_ source: Source) {
         guard let stream = streams[source] else { return }
         switch states[source] {
@@ -182,7 +185,7 @@ final class NativeMeetingCaptureDriver: CaptureDriving, @unchecked Sendable {
             return // Their pending completions stop and detach the stream.
         case .running?:
             states[source] = .stopping
-            stream.stop { [queue] _ in queue.async { stream.detachOutputs() } }
+            stopAndDetach(stream)
             streams[source] = nil
         case .ended?, nil:
             streams[source] = nil

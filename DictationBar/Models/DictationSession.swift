@@ -10,6 +10,15 @@ enum RecordingStopReason: String, Codable {
     case normal
     case interrupted
     case quit
+
+    /// Quit beats a normal stop, which beats an interruption: a user stop is never an interruption.
+    var priority: Int {
+        switch self {
+        case .interrupted: 0
+        case .normal: 1
+        case .quit: 2
+        }
+    }
 }
 
 struct OperationToken: Equatable {

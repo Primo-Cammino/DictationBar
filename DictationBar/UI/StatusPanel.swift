@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// What runs right now, as shown by the floating status panel (plan KTD9).
+/// What runs right now, as shown by the floating status panel.
 enum PanelActivity: Equatable {
     case dictation, transcription, meetingStarting, meetingSaving
     case meeting(since: Date)
@@ -126,12 +126,9 @@ struct StatusPanelView: View {
         switch activity {
         case .dictation:
             Label("Diktat läuft", systemImage: "mic.fill").foregroundStyle(.red)
-        case .transcription:
-            HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Transkription …") }
-        case .meetingStarting:
-            HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Meeting startet …") }
-        case .meetingSaving:
-            HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Meeting wird gespeichert …") }
+        case .transcription: busy("Transkription …")
+        case .meetingStarting: busy("Meeting startet …")
+        case .meetingSaving: busy("Meeting wird gespeichert …")
         case .meeting(let since):
             HStack(spacing: 8) {
                 Image(systemName: "record.circle").foregroundStyle(.red)
@@ -141,6 +138,10 @@ struct StatusPanelView: View {
                 Button("Stopp") { model.toggleMeeting() }.buttonStyle(.borderedProminent).tint(.red)
             }
         }
+    }
+
+    private func busy(_ text: String) -> some View {
+        HStack(spacing: 8) { ProgressView().controlSize(.small); Text(text) }
     }
 
     @ViewBuilder private func noticeRow(_ notice: PanelNotice) -> some View {

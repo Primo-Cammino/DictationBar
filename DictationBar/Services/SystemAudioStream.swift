@@ -13,6 +13,14 @@ protocol CaptureStreaming: AnyObject, Sendable {
 
 typealias CaptureSampleHandler = (CMSampleBuffer, Double) -> Void
 
+extension CMSampleBuffer {
+    /// Presentation time on the host clock, converted from the capture's own clock if it has one.
+    func hostSeconds(from clock: CMClock?) -> Double {
+        CMSyncConvertTime(presentationTimeStamp, from: clock ?? CMClockGetHostTimeClock(),
+                          to: CMClockGetHostTimeClock()).seconds
+    }
+}
+
 // stream is installed before publication, then start/stop/detachOutputs run only
 // on the driver's queue. Framework callbacks only forward immutable samples
 // and errors to the driver; they never mutate adapter state.
@@ -58,10 +66,7 @@ final class SystemAudioStream: NSObject, CaptureStreaming, SCStreamOutput, SCStr
     }
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .audio else { return }
-        let host = CMSyncConvertTime(sampleBuffer.presentationTimeStamp,
-                                     from: stream.synchronizationClock ?? CMClockGetHostTimeClock(),
-                                     to: CMClockGetHostTimeClock())
-        sample(sampleBuffer, host.seconds)
+        sample(sampleBuffer, sampleBuffer.hostSeconds(from: stream.synchronizationClock))
     }
     func stream(_ stream: SCStream, didStopWithError error: Error) { stopped(error) }
 }

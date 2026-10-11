@@ -21,7 +21,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Re-reads after every change of what the panel shows; content updates resize it.
     private func followStatusPanel(_ model: DictationModel) {
         let visible = withObservationTracking {
-            model.panelActivity != nil || model.notice != nil || model.missingSource != nil
+            // Read all three: `||` would skip, and so not track, the others while one is set.
+            let activity = model.panelActivity, notice = model.notice, missing = model.missingSource
+            return activity != nil || notice != nil || missing != nil
         } onChange: { [weak self, weak model] in
             Task { @MainActor in
                 guard let model else { return }

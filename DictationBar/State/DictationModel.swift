@@ -301,7 +301,7 @@ final class DictationModel {
     }
 
     /// Starts a meeting only when nothing else runs and stops only a recording
-    /// meeting; a stop while it is still preparing is ignored (plan KTD7).
+    /// meeting; a stop while it is still preparing is ignored.
     func toggleMeeting() {
         if isMeeting {
             if phase == .recording { stopRecording(reason: .normal) }
@@ -329,9 +329,7 @@ final class DictationModel {
 
     func stopRecording(reason: RecordingStopReason) {
         guard isBusy, [.preparing, .recording, .saving].contains(phase) else { return }
-        // Quit beats a normal stop, which beats an interruption: a user stop is never an interruption.
-        let rank: [RecordingStopReason: Int] = [.interrupted: 0, .normal: 1, .quit: 2]
-        if stopReason.map({ rank[reason]! > rank[$0]! }) ?? true { stopReason = reason }
+        if stopReason.map({ reason.priority > $0.priority }) ?? true { stopReason = reason }
         if let stopSignal {
             self.stopSignal = nil
             stopSignal.resume(returning: stopReason ?? reason)
