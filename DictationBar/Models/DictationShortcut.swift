@@ -7,6 +7,8 @@ struct DictationShortcut: Codable, Equatable {
 
     static let `default` = DictationShortcut(validatedKeyCode: UInt32(kVK_Space),
                                              modifiers: UInt32(controlKey | optionKey))
+    static let meetingDefault = DictationShortcut(validatedKeyCode: UInt32(kVK_ANSI_M),
+                                                  modifiers: UInt32(controlKey | optionKey))
 
     init?(keyCode: UInt32, modifiers: UInt32) {
         let supported = UInt32(cmdKey | controlKey | optionKey | shiftKey)

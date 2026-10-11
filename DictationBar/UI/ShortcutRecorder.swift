@@ -4,6 +4,7 @@ import SwiftUI
 
 @MainActor
 struct ShortcutRecorder: View {
+    let title: String
     let shortcut: DictationShortcut
     let onSelect: (DictationShortcut) -> Void
     @State private var editing = false
@@ -13,7 +14,7 @@ struct ShortcutRecorder: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            LabeledContent("Diktier-Tastenkürzel", value: shortcut.displayName)
+            LabeledContent(title, value: shortcut.displayName)
             HStack {
                 Button(editing ? "Tastenkürzel drücken …" : "Tastenkürzel ändern") { startEditing() }
                     .disabled(editing)

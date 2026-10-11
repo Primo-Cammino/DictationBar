@@ -11,12 +11,18 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Tastenkürzel") {
-                ShortcutRecorder(shortcut: dictation.shortcut) { value in
+                ShortcutRecorder(title: "Diktier-Tastenkürzel", shortcut: dictation.shortcut) { value in
                     Task { await dictation.configureShortcut(value) }
                 }.disabled(dictation.isBusy)
-                Text("Dasselbe Kürzel startet und stoppt das Diktat. Escape stoppt die Aufnahme.")
+                Text("Dasselbe Kürzel startet und stoppt das Diktat. Escape stoppt das Diktat.")
                     .font(.caption).foregroundStyle(.secondary)
                 if let message = dictation.shortcutMessage { Text(message).foregroundStyle(.secondary) }
+                ShortcutRecorder(title: "Meeting-Tastenkürzel", shortcut: dictation.meetingShortcut) { value in
+                    Task { await dictation.configureMeetingShortcut(value) }
+                }.disabled(dictation.isBusy)
+                Text("Startet und stoppt die Meeting-Aufnahme. Escape stoppt kein Meeting.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if let message = dictation.meetingShortcutMessage { Text(message).foregroundStyle(.secondary) }
             }
             Section("Aufnahme") {
                 Toggle("Bluetooth-Mikrofon automatisch bevorzugen", isOn: Binding(get: {

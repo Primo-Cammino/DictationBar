@@ -36,6 +36,70 @@ final class ModelRecoveryTests: XCTestCase {
     }
 
     @MainActor
+    func testMeetingShortcutDefaultsToControlOptionMAndRegistersIndependently() async throws {
+        let fixture = try await PipelineFixture(profile: .production, shortcutRegistrationFails: true)
+        defer { fixture.files.cleanup() }
+        XCTAssertEqual(fixture.model.meetingShortcut.displayName, "⌃⌥M")
+        XCTAssertEqual(fixture.shortcuts.configuredMeetingShortcut, fixture.model.meetingShortcut)
+        XCTAssertEqual(fixture.shortcuts.meetingRegistrations, 1)
+        XCTAssertNotNil(fixture.model.shortcutMessage, "dictation failed")
+        XCTAssertNil(fixture.model.meetingShortcutMessage, "meeting is unaffected")
+        fixture.shortcuts.onMeeting?()
+        try await fixture.wait { fixture.model.phase == .recording }
+        XCTAssertTrue(fixture.model.isMeeting)
+        fixture.shortcuts.onMeeting?()
+        try await fixture.wait { !fixture.model.isBusy }
+        // A newly chosen dictation shortcut registers after the failure.
+        fixture.shortcuts.registrationFails = false
+        await fixture.model.configureShortcut(optionR)
+        XCTAssertNil(fixture.model.shortcutMessage)
+        XCTAssertEqual(fixture.shortcuts.configuredShortcut, optionR)
+    }
+
+    @MainActor
+    func testFailedMeetingShortcutKeepsDictationShortcutAndMeetingButton() async throws {
+        let fixture = try await PipelineFixture(profile: .production, meetingRegistrationFails: true)
+        defer { fixture.files.cleanup() }
+        XCTAssertNotNil(fixture.model.meetingShortcutMessage)
+        XCTAssertNil(fixture.model.shortcutMessage)
+        XCTAssertEqual(fixture.shortcuts.registrations, 1)
+        try await fixture.startMeeting()
+        XCTAssertTrue(fixture.model.isMeeting)
+    }
+
+    @MainActor
+    func testMeetingShortcutEqualToDictationShortcutIsRefused() async throws {
+        let fixture = try await PipelineFixture(profile: .production)
+        defer { fixture.files.cleanup() }
+        let before = fixture.shortcuts.meetingRegistrations
+        await fixture.model.configureMeetingShortcut(fixture.model.shortcut)
+        XCTAssertEqual(fixture.model.meetingShortcut.displayName, "⌃⌥M")
+        XCTAssertEqual(fixture.shortcuts.meetingRegistrations, before)
+        XCTAssertEqual(fixture.model.meetingShortcutMessage, "Das Meeting-Kürzel muss sich vom Diktat-Kürzel unterscheiden.")
+    }
+
+    @MainActor
+    func testChosenMeetingShortcutIsSavedAndRegisteredAgainAfterRestart() async throws {
+        let fixture = try await PipelineFixture(profile: .production)
+        defer { fixture.files.cleanup() }
+        let optionShiftM = try XCTUnwrap(DictationShortcut(keyCode: UInt32(kVK_ANSI_M), modifiers: UInt32(optionKey | shiftKey)))
+        await fixture.model.configureMeetingShortcut(optionShiftM)
+        XCTAssertEqual(fixture.model.meetingShortcut, optionShiftM)
+        XCTAssertNil(fixture.model.meetingShortcutMessage)
+        let saved = try await FolderStore(supportURL: fixture.files.support).load()
+        XCTAssertEqual(saved.meetingShortcut, optionShiftM)
+        let restarted = PipelineShortcuts()
+        let model = DictationModel(profile: .production, services: DictationServices(
+            folders: FolderStore(supportURL: fixture.files.support), history: fixture.history,
+            recordings: RecordingStore(history: fixture.history), microphones: fixture.microphone,
+            recorder: fixture.recorder, keys: TestKeyStore(), transcriber: fixture.transcriber,
+            shortcuts: restarted, inserter: fixture.inserter))
+        await model.initialize()
+        XCTAssertEqual(restarted.configuredMeetingShortcut, optionShiftM)
+        XCTAssertEqual(restarted.meetingRegistrations, 1)
+    }
+
+    @MainActor
     func testTestingShortcutConfigurationRemainsPassive() async throws {
         let fixture = try await PipelineFixture()
         defer { fixture.files.cleanup() }

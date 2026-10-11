@@ -15,6 +15,7 @@ final class PipelineFixture {
 
     /// `existing` entries are journaled with a valid WAV before the model starts.
     init(profile: RuntimeProfile = .testing, shortcutRegistrationFails: Bool = false,
+         meetingRegistrationFails: Bool = false,
          beforeWrite: @escaping () throws -> Void = {},
          existing: (LocalStoreFixture) throws -> [HistoryEntry] = { _ in [] }) async throws {
         files = try LocalStoreFixture()
@@ -31,6 +32,7 @@ final class PipelineFixture {
             shortcuts: shortcuts, inserter: inserter,
             requestSystemAudioAccess: { [systemAudio] in systemAudio.request() })
         shortcuts.registrationFails = shortcutRegistrationFails
+        shortcuts.meetingRegistrationFails = meetingRegistrationFails
         model = DictationModel(profile: profile, services: services)
         await model.initialize()
         inserter.beforeInsert = { [history] in
@@ -166,14 +168,23 @@ final class PipelineInserter: TextInsertionProviding {
 final class PipelineShortcuts: GlobalShortcutProviding {
     var onToggle: (() -> Void)?
     var onEscape: (() -> Void)?
+    var onMeeting: (() -> Void)?
     var registrations = 0
+    var meetingRegistrations = 0
     var escapeActive = false
     var registrationFails = false
+    var meetingRegistrationFails = false
     var configuredShortcut = DictationShortcut.default
+    var configuredMeetingShortcut: DictationShortcut?
     func configure(_ shortcut: DictationShortcut) throws { configuredShortcut = shortcut }
     func register() throws {
         registrations += 1
         if registrationFails { throw ShortcutFailure.registration }
+    }
+    func configureMeeting(_ shortcut: DictationShortcut) throws { configuredMeetingShortcut = shortcut }
+    func registerMeeting() throws {
+        meetingRegistrations += 1
+        if meetingRegistrationFails { throw ShortcutFailure.registration }
     }
     func setCaptureActive(_ active: Bool) { escapeActive = active }
     func unregister() { escapeActive = false }

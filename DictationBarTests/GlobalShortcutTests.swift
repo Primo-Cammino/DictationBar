@@ -35,4 +35,20 @@ final class GlobalShortcutTests: XCTestCase {
         router.receive(id: 2, down: true)
         XCTAssertEqual(stops, 2)
     }
+
+    @MainActor
+    func testMeetingHotKeyHasItsOwnCallbackAndRepeatProtection() async {
+        let router = ShortcutEventRouter()
+        var toggles = 0, meetings = 0
+        router.onToggle = { toggles += 1 }
+        router.onMeeting = { meetings += 1 }
+        router.receive(id: 3, down: true)
+        router.receive(id: 3, down: true)
+        router.receive(id: 1, down: true)
+        XCTAssertEqual(meetings, 1)
+        XCTAssertEqual(toggles, 1)
+        router.receive(id: 3, down: false)
+        router.receive(id: 3, down: true)
+        XCTAssertEqual(meetings, 2)
+    }
 }

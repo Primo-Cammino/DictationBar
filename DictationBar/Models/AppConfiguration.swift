@@ -5,6 +5,7 @@ struct AppConfiguration: Codable, Equatable {
     var folderBookmark: Data?
     var preferBluetooth: Bool?
     var shortcut: DictationShortcut?
+    var meetingShortcut: DictationShortcut?
 
     init(microphoneID: String? = nil, folderBookmark: Data? = nil) {
         self.microphoneID = microphoneID

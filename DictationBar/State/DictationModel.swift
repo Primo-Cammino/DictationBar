@@ -18,6 +18,7 @@ final class DictationModel {
     private(set) var missingSource: MeetingMixer.Source?
     var isMeeting: Bool { activeToken?.origin == .meeting }
     var shortcut: DictationShortcut { configuration.shortcut ?? .default }
+    var meetingShortcut: DictationShortcut { configuration.meetingShortcut ?? .meetingDefault }
     var preferredMicrophone: Microphone? {
         MicrophoneRouting.preferred(microphones, configuredID: configuration.microphoneID,
                                     automaticBluetooth: configuration.preferBluetooth ?? true)
@@ -35,6 +36,7 @@ final class DictationModel {
     private(set) var folderName = "Noch nicht gewählt"
     private(set) var keyStatus = "Noch nicht geprüft"
     private(set) var shortcutMessage: String?
+    private(set) var meetingShortcutMessage: String?
     @ObservationIgnored private let services: DictationServices?
     @ObservationIgnored private var operationTask: Task<Void, Never>?
     @ObservationIgnored private var currentEntry: HistoryEntry?
@@ -136,9 +138,13 @@ final class DictationModel {
         }
         services.shortcuts.onToggle = { [weak self] in self?.toggleRecording() }
         services.shortcuts.onEscape = { [weak self] in self?.stopRecording(reason: .normal) }
+        services.shortcuts.onMeeting = { [weak self] in self?.toggleMeeting() }
         if profile == .production {
+            // Registered separately: a key held by another app must not block the other one.
             do { try services.shortcuts.configure(shortcut); try services.shortcuts.register() }
             catch { shortcutMessage = Self.userMessage(error) }
+            do { try services.shortcuts.configureMeeting(meetingShortcut); try services.shortcuts.registerMeeting() }
+            catch { meetingShortcutMessage = Self.userMessage(error) }
         }
         initialized = true
         if profile == .production { services.microphones.startMonitoring() }
@@ -160,6 +166,10 @@ final class DictationModel {
 
     func configureShortcut(_ value: DictationShortcut) async {
         guard !isBusy else { return }
+        guard value != meetingShortcut else {
+            shortcutMessage = "Das Diktat-Kürzel muss sich vom Meeting-Kürzel unterscheiden."
+            return
+        }
         do {
             try services?.shortcuts.configure(value)
             if profile == .production { try services?.shortcuts.register() }
@@ -167,6 +177,21 @@ final class DictationModel {
             shortcutMessage = nil
             await saveConfiguration()
         } catch { shortcutMessage = error.localizedDescription }
+    }
+
+    func configureMeetingShortcut(_ value: DictationShortcut) async {
+        guard !isBusy else { return }
+        guard value != shortcut else {
+            meetingShortcutMessage = "Das Meeting-Kürzel muss sich vom Diktat-Kürzel unterscheiden."
+            return
+        }
+        do {
+            try services?.shortcuts.configureMeeting(value)
+            if profile == .production { try services?.shortcuts.registerMeeting() }
+            configuration.meetingShortcut = value
+            meetingShortcutMessage = nil
+            await saveConfiguration()
+        } catch { meetingShortcutMessage = error.localizedDescription }
     }
 
     func setPreferBluetooth(_ value: Bool) async {

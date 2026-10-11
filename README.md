@@ -27,7 +27,7 @@ Dieser Einfügeversuch nutzt die Zwischenablage nur kurz: Danach steht der vorhe
 
 ## Meeting aufnehmen
 
-**Meeting starten** in der App-Ansicht nimmt den Systemton aller Apps (Teams, Zoom, Browser) und das fürs Diktat gewählte Mikrofon gemischt in eine Mono-WAV auf, ohne Zeitlimit. Beim ersten Meeting fragt macOS nach der Freigabe unter **Datenschutz & Sicherheit › Bildschirm- & Systemaudioaufnahme**. Gestoppt wird nur über **Meeting stoppen**; **Escape** bleibt während eines Meetings für andere Apps frei, und das Diktat-Kürzel ist gesperrt. Kopfhörer tragen, sonst landen die anderen Stimmen doppelt in der Datei.
+**Meeting starten** in der App-Ansicht nimmt den Systemton aller Apps (Teams, Zoom, Browser) und das fürs Diktat gewählte Mikrofon gemischt in eine Mono-WAV auf, ohne Zeitlimit. Beim ersten Meeting fragt macOS nach der Freigabe unter **Datenschutz & Sicherheit › Bildschirm- & Systemaudioaufnahme**. Das eigene Meeting-Kürzel **⌃⌥M** (in den Einstellungen änderbar) startet und stoppt ebenfalls. Gestoppt wird nur über **Meeting stoppen** oder dieses Kürzel; **Escape** bleibt während eines Meetings für andere Apps frei, und das Diktat-Kürzel ist gesperrt. Kopfhörer tragen, sonst landen die anderen Stimmen doppelt in der Datei.
 
 Nach dem Stopp liegt die Datei `Meeting-….wav` in der History. Sie wird nicht transkribiert und nicht hochgeladen; über **Im Finder zeigen** lässt sie sich manuell in Mistral Audio Studio hochladen, das die Sprecher trennt. Fällt während des Meetings eine Quelle aus, etwa das Headset, läuft die Aufnahme mit der anderen weiter.
 

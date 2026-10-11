@@ -3,11 +3,14 @@ import Foundation
 
 @MainActor
 final class NativeGlobalShortcutService: GlobalShortcutProviding {
+    private static let signature: OSType = 0x44426172
     private let router = ShortcutEventRouter()
     private var handler: EventHandlerRef?
     private var toggle: EventHotKeyRef?
+    private var meeting: EventHotKeyRef?
     private var escape: EventHotKeyRef?
     private var shortcut = DictationShortcut.default
+    private var meetingShortcut = DictationShortcut.meetingDefault
 
     var onToggle: (() -> Void)? {
         get { router.onToggle }
@@ -17,26 +20,57 @@ final class NativeGlobalShortcutService: GlobalShortcutProviding {
         get { router.onEscape }
         set { router.onEscape = newValue }
     }
+    var onMeeting: (() -> Void)? {
+        get { router.onMeeting }
+        set { router.onMeeting = newValue }
+    }
 
     func configure(_ shortcut: DictationShortcut) throws {
-        guard self.shortcut != shortcut else { return }
-        guard let current = toggle else {
-            self.shortcut = shortcut
-            return
-        }
-        var replacement: EventHotKeyRef?
-        let hotKey = EventHotKeyID(signature: 0x44426172, id: 1)
-        guard RegisterEventHotKey(shortcut.keyCode, shortcut.modifiers, hotKey,
-                                  GetApplicationEventTarget(), 0, &replacement) == noErr,
-              let replacement else { throw ShortcutFailure.registration }
-        UnregisterEventHotKey(current)
-        toggle = replacement
-        self.shortcut = shortcut
-        // The old key's release will no longer arrive after unregistering it.
-        router.receive(id: 1, down: false)
+        try replace(&toggle, current: &self.shortcut, with: shortcut, id: 1)
+    }
+
+    func configureMeeting(_ shortcut: DictationShortcut) throws {
+        try replace(&meeting, current: &meetingShortcut, with: shortcut, id: 3)
     }
 
     func register() throws {
+        try installHandler()
+        try registerHotKey(&toggle, shortcut, id: 1)
+    }
+
+    func registerMeeting() throws {
+        try installHandler()
+        try registerHotKey(&meeting, meetingShortcut, id: 3)
+    }
+
+    /// A registered key is swapped by registering the new one before removing the old,
+    /// so a failure keeps the previous shortcut working.
+    private func replace(_ ref: inout EventHotKeyRef?, current: inout DictationShortcut,
+                         with shortcut: DictationShortcut, id: UInt32) throws {
+        guard current != shortcut else { return }
+        guard let old = ref else { current = shortcut; return }
+        var replacement: EventHotKeyRef?
+        guard RegisterEventHotKey(shortcut.keyCode, shortcut.modifiers, EventHotKeyID(signature: Self.signature, id: id),
+                                  GetApplicationEventTarget(), 0, &replacement) == noErr,
+              let replacement else { throw ShortcutFailure.registration }
+        UnregisterEventHotKey(old)
+        ref = replacement
+        current = shortcut
+        // The old key's release will no longer arrive after unregistering it.
+        router.receive(id: id, down: false)
+    }
+
+    /// Each key registers on its own; a key another app holds leaves only that key unregistered.
+    private func registerHotKey(_ ref: inout EventHotKeyRef?, _ shortcut: DictationShortcut, id: UInt32) throws {
+        guard ref == nil else { return }
+        guard RegisterEventHotKey(shortcut.keyCode, shortcut.modifiers, EventHotKeyID(signature: Self.signature, id: id),
+                                  GetApplicationEventTarget(), 0, &ref) == noErr else {
+            ref = nil
+            throw ShortcutFailure.registration
+        }
+    }
+
+    private func installHandler() throws {
         guard handler == nil else { return }
         var events = [
             EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
@@ -57,13 +91,7 @@ final class NativeGlobalShortcutService: GlobalShortcutProviding {
             }
             return noErr
         }, events.count, &events, context, &handler)
-        guard status == noErr else { throw ShortcutFailure.registration }
-        let hotKey = EventHotKeyID(signature: 0x44426172, id: 1)
-        guard RegisterEventHotKey(shortcut.keyCode, shortcut.modifiers, hotKey,
-                                  GetApplicationEventTarget(), 0, &toggle) == noErr else {
-            unregister()
-            throw ShortcutFailure.registration
-        }
+        guard status == noErr else { handler = nil; throw ShortcutFailure.registration }
     }
 
     func setCaptureActive(_ active: Bool) throws {
@@ -72,7 +100,7 @@ final class NativeGlobalShortcutService: GlobalShortcutProviding {
             if let escape { UnregisterEventHotKey(escape) }
             escape = nil
         } else if escape == nil {
-            let hotKey = EventHotKeyID(signature: 0x44426172, id: 2)
+            let hotKey = EventHotKeyID(signature: Self.signature, id: 2)
             guard RegisterEventHotKey(UInt32(kVK_Escape), 0, hotKey,
                                      GetApplicationEventTarget(), 0, &escape) == noErr else {
                 throw ShortcutFailure.escape
@@ -81,10 +109,9 @@ final class NativeGlobalShortcutService: GlobalShortcutProviding {
     }
 
     func unregister() {
-        if let escape { UnregisterEventHotKey(escape) }
-        if let toggle { UnregisterEventHotKey(toggle) }
+        for ref in [escape, toggle, meeting] { if let ref { UnregisterEventHotKey(ref) } }
         if let handler { RemoveEventHandler(handler) }
-        escape = nil; toggle = nil; handler = nil
+        escape = nil; toggle = nil; meeting = nil; handler = nil
         router.reset()
     }
 }
