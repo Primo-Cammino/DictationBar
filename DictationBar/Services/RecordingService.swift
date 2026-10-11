@@ -24,6 +24,8 @@ enum CaptureEvent {
     case failedToStart
     case microphoneChanged(String)
     case microphoneSwitchFailed
+    /// One meeting source ended; the recording continues with the other.
+    case sourceLost(MeetingMixer.Source)
 }
 
 protocol CaptureDriving: AnyObject {
@@ -42,8 +44,10 @@ protocol RecordingProviding: AnyObject {
     var onInterruption: (() -> Void)? { get set }
     var onMicrophoneChanged: ((String) -> Void)? { get set }
     var onMicrophoneSwitchFailed: (() -> Void)? { get set }
+    var onSourceLost: ((MeetingMixer.Source) -> Void)? { get set }
     func switchMicrophone(to id: String)
-    func startBrowser(_ target: BrowserAudioTarget, paths: RecordingPaths) async throws
+    /// System audio of all apps plus `microphoneID`, mixed into one WAV.
+    func startMeeting(microphoneID: String, paths: RecordingPaths) async throws
     func start(microphoneID: String, paths: RecordingPaths) async throws
     func stop() async throws -> CaptureCompletion
 }
@@ -51,8 +55,9 @@ protocol RecordingProviding: AnyObject {
 extension RecordingProviding {
     var onMicrophoneChanged: ((String) -> Void)? { get { nil } set { } }
     var onMicrophoneSwitchFailed: (() -> Void)? { get { nil } set { } }
+    var onSourceLost: ((MeetingMixer.Source) -> Void)? { get { nil } set { } }
     func switchMicrophone(to id: String) { }
-    func startBrowser(_ target: BrowserAudioTarget, paths: RecordingPaths) async throws { throw CaptureFailure.configuration }
+    func startMeeting(microphoneID: String, paths: RecordingPaths) async throws { throw CaptureFailure.configuration }
 }
 
 /// The driver owns AVFoundation on a serial queue; this boundary owns callbacks,
@@ -61,8 +66,7 @@ extension RecordingProviding {
 final class RecordingService: RecordingProviding {
     typealias DriverFactory = (String, RecordingPaths, @escaping (CaptureEvent) -> Void) -> any CaptureDriving
     private let makeDriver: DriverFactory
-    typealias BrowserDriverFactory = (BrowserAudioTarget, RecordingPaths, @escaping (CaptureEvent) -> Void) -> any CaptureDriving
-    private let makeBrowserDriver: BrowserDriverFactory?
+    private let makeMeetingDriver: DriverFactory?
     private let deadline: UInt64
     private var driver: (any CaptureDriving)?
     private var generation: UUID?
@@ -74,20 +78,21 @@ final class RecordingService: RecordingProviding {
     var onInterruption: (() -> Void)?
     var onMicrophoneChanged: ((String) -> Void)?
     var onMicrophoneSwitchFailed: (() -> Void)?
+    var onSourceLost: ((MeetingMixer.Source) -> Void)?
 
-    init(deadlineNanoseconds: UInt64 = 15_000_000_000, makeBrowserDriver: BrowserDriverFactory? = nil, makeDriver: @escaping DriverFactory) {
+    init(deadlineNanoseconds: UInt64 = 15_000_000_000, makeMeetingDriver: DriverFactory? = nil, makeDriver: @escaping DriverFactory) {
         deadline = deadlineNanoseconds
         self.makeDriver = makeDriver
-        self.makeBrowserDriver = makeBrowserDriver
+        self.makeMeetingDriver = makeMeetingDriver
     }
 
     func start(microphoneID: String, paths: RecordingPaths) async throws {
         try await startDriver { event in makeDriver(microphoneID, paths, event) }
     }
 
-    func startBrowser(_ target: BrowserAudioTarget, paths: RecordingPaths) async throws {
-        guard let makeBrowserDriver else { throw CaptureFailure.configuration }
-        try await startDriver { event in makeBrowserDriver(target, paths, event) }
+    func startMeeting(microphoneID: String, paths: RecordingPaths) async throws {
+        guard let makeMeetingDriver else { throw CaptureFailure.configuration }
+        try await startDriver { event in makeMeetingDriver(microphoneID, paths, event) }
     }
 
     func switchMicrophone(to id: String) {
@@ -156,6 +161,8 @@ final class RecordingService: RecordingProviding {
             if !stopRequested { onMicrophoneChanged?(microphoneID) }
         case .microphoneSwitchFailed:
             if !stopRequested { onMicrophoneSwitchFailed?() }
+        case .sourceLost(let source):
+            if !stopRequested { onSourceLost?(source) }
         case .failedToStart:
             finish(CaptureCompletion(interrupted: true))
         }

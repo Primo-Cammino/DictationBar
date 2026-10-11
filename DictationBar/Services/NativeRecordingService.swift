@@ -28,22 +28,8 @@ final class NativeCaptureDriver: NSObject, CaptureDriving, AVCaptureAudioDataOut
         queue.async { [self] in
             guard !started, !finished, !stopRequested else { return }
             do {
-                guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
-                      let device = AVCaptureDevice(uniqueID: microphoneID), device.hasMediaType(.audio),
-                      device.isConnected else {
-                    throw CaptureFailure.deviceUnavailable
-                }
-                let input = try AVCaptureDeviceInput(device: device)
-                let session = AVCaptureSession()
-                let output = AVCaptureAudioDataOutput()
-                session.beginConfiguration()
-                guard session.canAddInput(input), session.canAddOutput(output) else {
-                    session.commitConfiguration()
-                    throw CaptureFailure.configuration
-                }
-                session.addInput(input)
-                session.addOutput(output)
-                session.commitConfiguration()
+                let (session, input, output) = try Self.makeSession(microphoneID: microphoneID)
+                let device = input.device
                 self.session = session
                 self.input = input
                 self.output = output
@@ -69,6 +55,28 @@ final class NativeCaptureDriver: NSObject, CaptureDriving, AVCaptureAudioDataOut
             stopRequested = true
             finish()
         }
+    }
+
+    /// A configured, not yet running session for one connected, authorized microphone.
+    static func makeSession(microphoneID: String) throws
+        -> (AVCaptureSession, AVCaptureDeviceInput, AVCaptureAudioDataOutput) {
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+              let device = AVCaptureDevice(uniqueID: microphoneID), device.hasMediaType(.audio),
+              device.isConnected else {
+            throw CaptureFailure.deviceUnavailable
+        }
+        let input = try AVCaptureDeviceInput(device: device)
+        let session = AVCaptureSession()
+        let output = AVCaptureAudioDataOutput()
+        session.beginConfiguration()
+        guard session.canAddInput(input), session.canAddOutput(output) else {
+            session.commitConfiguration()
+            throw CaptureFailure.configuration
+        }
+        session.addInput(input)
+        session.addOutput(output)
+        session.commitConfiguration()
+        return (session, input, output)
     }
 
     func switchMicrophone(to id: String) {
@@ -187,5 +195,64 @@ final class NativeCaptureDriver: NSObject, CaptureDriving, AVCaptureAudioDataOut
         input = nil
         output = nil
         session = nil
+    }
+}
+
+/// The meeting's microphone source. It never switches devices (plan KTD2);
+/// a disconnect or runtime error reports `stopped`, and the driver decides.
+// start/stop/detachOutputs run on the driver's queue; samples arrive there too.
+final class MicrophoneStream: NSObject, CaptureStreaming, AVCaptureAudioDataOutputSampleBufferDelegate,
+                              @unchecked Sendable {
+    private var session: AVCaptureSession?
+    private let device: AVCaptureDevice
+    private let output: AVCaptureAudioDataOutput
+    private let sample: CaptureSampleHandler
+    private var observers: [NSObjectProtocol] = []
+
+    init(microphoneID: String, queue: DispatchQueue, sample: @escaping CaptureSampleHandler,
+         stopped: @escaping (Error) -> Void) throws {
+        let (session, input, output) = try NativeCaptureDriver.makeSession(microphoneID: microphoneID)
+        self.session = session
+        device = input.device
+        self.output = output
+        self.sample = sample
+        super.init()
+        output.setSampleBufferDelegate(self, queue: queue)
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(forName: .AVCaptureSessionRuntimeError, object: session, queue: nil) { _ in
+            stopped(CaptureFailure.deviceUnavailable)
+        })
+        observers.append(center.addObserver(forName: .AVCaptureDeviceWasDisconnected, object: input.device,
+                                            queue: nil) { _ in
+            stopped(CaptureFailure.deviceUnavailable)
+        })
+    }
+
+    func start(completion: @escaping (Error?) -> Void) {
+        session?.startRunning()
+        completion(session?.isRunning == true && device.isConnected ? nil : CaptureFailure.start)
+    }
+
+    func stop(completion: @escaping (Error?) -> Void) {
+        output.setSampleBufferDelegate(nil, queue: nil)
+        session?.stopRunning()
+        completion(nil)
+    }
+
+    func detachOutputs() {
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+        output.setSampleBufferDelegate(nil, queue: nil)
+        if session?.isRunning == true { session?.stopRunning() }
+        session = nil
+    }
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
+                       from connection: AVCaptureConnection) {
+        // A pure audio session may run on the device clock; the mixer needs host time.
+        let host = CMSyncConvertTime(sampleBuffer.presentationTimeStamp,
+                                     from: session?.synchronizationClock ?? CMClockGetHostTimeClock(),
+                                     to: CMClockGetHostTimeClock())
+        sample(sampleBuffer, host.seconds)
     }
 }

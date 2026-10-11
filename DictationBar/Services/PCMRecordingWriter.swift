@@ -7,7 +7,7 @@ enum PCMRecordingWriterError: Error {
     case closed, invalidBuffer, conversion, tooLarge
 }
 
-/// Single-queue writer shared by microphone and browser capture. Only this
+/// Single-queue writer shared by microphone and meeting capture. Only this
 /// descriptor writes the WAV; source changes retain both the file and its bytes.
 final class PCMRecordingWriter {
     private let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 48_000,
@@ -43,29 +43,34 @@ final class PCMRecordingWriter {
     func append(_ sampleBuffer: CMSampleBuffer) throws {
         guard handle != nil, !appendFailed else { throw PCMRecordingWriterError.closed }
         do {
-            guard CMSampleBufferDataIsReady(sampleBuffer),
-                  let description = CMSampleBufferGetFormatDescription(sampleBuffer),
-                  let basic = CMAudioFormatDescriptionGetStreamBasicDescription(description),
-                  basic.pointee.mFormatID == kAudioFormatLinearPCM else {
-                throw PCMRecordingWriterError.invalidBuffer
-            }
-            let frames = CMSampleBufferGetNumSamples(sampleBuffer)
-            guard frames >= 0, frames <= Int(Int32.max) else { throw PCMRecordingWriterError.invalidBuffer }
-            if frames == 0 { return }
-            let source = AVAudioFormat(cmAudioFormatDescription: description)
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: source, frameCapacity: AVAudioFrameCount(frames)) else {
-                throw PCMRecordingWriterError.invalidBuffer
-            }
-            buffer.frameLength = AVAudioFrameCount(frames)
-            guard CMSampleBufferCopyPCMDataIntoAudioBufferList(sampleBuffer, at: 0,
-                    frameCount: Int32(frames), into: buffer.mutableAudioBufferList) == noErr else {
-                throw PCMRecordingWriterError.invalidBuffer
-            }
-            try append(buffer)
+            if let buffer = try Self.pcmBuffer(sampleBuffer) { try append(buffer) }
         } catch {
             appendFailed = true
             throw error
         }
+    }
+
+    /// Copies a linear-PCM sample buffer; nil when it holds no frames.
+    static func pcmBuffer(_ sampleBuffer: CMSampleBuffer) throws -> AVAudioPCMBuffer? {
+        guard CMSampleBufferDataIsReady(sampleBuffer),
+              let description = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let basic = CMAudioFormatDescriptionGetStreamBasicDescription(description),
+              basic.pointee.mFormatID == kAudioFormatLinearPCM else {
+            throw PCMRecordingWriterError.invalidBuffer
+        }
+        let frames = CMSampleBufferGetNumSamples(sampleBuffer)
+        guard frames >= 0, frames <= Int(Int32.max) else { throw PCMRecordingWriterError.invalidBuffer }
+        if frames == 0 { return nil }
+        let source = AVAudioFormat(cmAudioFormatDescription: description)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: source, frameCapacity: AVAudioFrameCount(frames)) else {
+            throw PCMRecordingWriterError.invalidBuffer
+        }
+        buffer.frameLength = AVAudioFrameCount(frames)
+        guard CMSampleBufferCopyPCMDataIntoAudioBufferList(sampleBuffer, at: 0,
+                frameCount: Int32(frames), into: buffer.mutableAudioBufferList) == noErr else {
+            throw PCMRecordingWriterError.invalidBuffer
+        }
+        return buffer
     }
 
     func append(_ buffer: AVAudioPCMBuffer) throws {

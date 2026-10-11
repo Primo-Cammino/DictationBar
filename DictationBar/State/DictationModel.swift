@@ -203,9 +203,14 @@ final class DictationModel {
     func recordSuggestedBrowser(_ target: BrowserAudioTarget) {
         guard canStart, browserSuggestion == target else { return }
         browserPolicy.dismiss(target)
-        guard let token = begin(origin: .browserRecording) else { return }
+        startMeetingPreview()
+    }
+
+    // ponytail: temporary U8 bridge for the real-Mac test; U9 removes it, U4 builds the meeting flow.
+    func startMeetingPreview() {
+        guard canStart, let token = begin(origin: .browserRecording) else { return }
         stopReason = nil
-        operationTask = Task { await executeLive(token, browser: target) }
+        operationTask = Task { await executeLive(token) }
     }
 
     private func stopMonitoring() {
@@ -344,27 +349,24 @@ final class DictationModel {
         return true
     }
 
-    private func executeLive(_ token: OperationToken, browser: BrowserAudioTarget? = nil) async {
+    private func executeLive(_ token: OperationToken) async {
         guard let services, let snapshot = session?.configuration else { finish(token: token); return }
+        let meeting = token.origin == .browserRecording
         currentEntry = nil
         do {
             guard snapshot.folderBookmark != nil else { throw LocalStoreError.missingFolder }
-            let microphoneID: String
-            if let browser {
+            if meeting {
                 guard await services.browserAudio?.requestCaptureAccess() == true else { throw BrowserCaptureAccessFailure.denied }
-                microphoneID = "browser:" + browser.bundleID
-            } else {
-                guard await services.microphones.requestAccess() else { throw MicrophoneAccessFailure.denied }
-                microphones = services.microphones.microphones()
-                guard let microphone = MicrophoneRouting.preferred(microphones, configuredID: snapshot.microphoneID,
-                                                automaticBluetooth: snapshot.preferBluetooth ?? true) else { throw CaptureFailure.deviceUnavailable }
-                microphoneID = microphone.id
-                actualMicrophoneID = microphoneID
             }
+            guard await services.microphones.requestAccess() else { throw MicrophoneAccessFailure.denied }
+            microphones = services.microphones.microphones()
+            guard let microphone = MicrophoneRouting.preferred(microphones, configuredID: snapshot.microphoneID,
+                                            automaticBluetooth: snapshot.preferBluetooth ?? true) else { throw CaptureFailure.deviceUnavailable }
+            let microphoneID = microphone.id
+            actualMicrophoneID = microphoneID
             guard isCurrent(token), !quitRequested else { await finishOperation(token); return }
-            var entry = HistoryEntry(id: token.id, createdAt: session?.createdAt ?? Date(),
-                                     microphoneID: microphoneID, folderBookmark: snapshot.folderBookmark!)
-            entry.sourceLabel = browser.map { $0.name + " · Browser-Audio" }
+            var entry = HistoryEntry(id: token.id, createdAt: session?.createdAt ?? Date(), microphoneID: microphoneID,
+                                     folderBookmark: snapshot.folderBookmark!, kind: meeting ? .meeting : nil)
             currentEntry = entry
             let paths = try await services.recordings.prepare(entry, token: token)
             guard isCurrent(token) else { return }
@@ -382,7 +384,7 @@ final class DictationModel {
             preservation = .audio(entry)
             do { try services.shortcuts.setCaptureActive(true) }
             catch { shortcutMessage = Self.userMessage(error) }
-            if let browser { try await services.recorder.startBrowser(browser, paths: paths) }
+            if meeting { try await services.recorder.startMeeting(microphoneID: microphoneID, paths: paths) }
             else { try await services.recorder.start(microphoneID: microphoneID, paths: paths) }
             var visible = entry
             visible.status = .recording

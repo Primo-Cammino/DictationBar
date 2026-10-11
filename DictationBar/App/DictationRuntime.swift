@@ -23,7 +23,7 @@ enum DictationRuntime {
             let services = DictationServices(
                 folders: FolderStore(), history: history, recordings: RecordingStore(history: history),
                 microphones: MicrophoneService(),
-                recorder: RecordingService(makeBrowserDriver: { NativeBrowserCaptureDriver(target: $0, paths: $1, event: $2) }) { NativeCaptureDriver(microphoneID: $0, paths: $1, event: $2) },
+                recorder: RecordingService(makeMeetingDriver: { NativeMeetingCaptureDriver(microphoneID: $0, paths: $1, event: $2) }) { NativeCaptureDriver(microphoneID: $0, paths: $1, event: $2) },
                 keys: keys, transcriber: MistralTranscriptionService(keys: keys),
                 shortcuts: NativeGlobalShortcutService(),
                 inserter: TextInsertionService(environment: NativeTextInsertionEnvironment()),

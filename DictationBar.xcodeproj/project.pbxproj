@@ -6,9 +6,9 @@
 	objects = {
 		080A90329C3F95B4CCB059A8 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModelRecoveryTests.swift"; sourceTree = "<group>"; };
 		22FBF1A30A179919FFD53090 = { isa = PBXBuildFile; fileRef = 080A90329C3F95B4CCB059A8; };
-		48367C9FBD206C8B2A67B340 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NativeBrowserCaptureDriverTests.swift"; sourceTree = "<group>"; };
+		48367C9FBD206C8B2A67B340 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NativeMeetingCaptureDriverTests.swift"; sourceTree = "<group>"; };
 		A385A56DFF18ED2B01B0B9FD = { isa = PBXBuildFile; fileRef = 48367C9FBD206C8B2A67B340; };
-		3B896ED19EC2C29C0ECFF21C = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ScreenCaptureBrowserStream.swift"; sourceTree = "<group>"; };
+		3B896ED19EC2C29C0ECFF21C = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/SystemAudioStream.swift"; sourceTree = "<group>"; };
 		CE86FD4716680CB441C3FA7E = { isa = PBXBuildFile; fileRef = 3B896ED19EC2C29C0ECFF21C; };
 		EB95DC99556955D5F5C7DFB2 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/ShortcutRecorder.swift"; sourceTree = "<group>"; };
 		3B1E85B1BB81F2774B294830 = { isa = PBXBuildFile; fileRef = EB95DC99556955D5F5C7DFB2; };
@@ -28,7 +28,7 @@
 		4D4545544D49584552000002 = { isa = PBXBuildFile; fileRef = 4D4545544D49584552000001; };
 		4D4545544D49584552000003 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MeetingMixerTests.swift"; sourceTree = "<group>"; };
 		4D4545544D49584552000004 = { isa = PBXBuildFile; fileRef = 4D4545544D49584552000003; };
-		5E83A21152612B04575F7A04 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/NativeBrowserCaptureDriver.swift"; sourceTree = "<group>"; };
+		5E83A21152612B04575F7A04 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/NativeMeetingCaptureDriver.swift"; sourceTree = "<group>"; };
 		0DBC58198F87774D986506FB = { isa = PBXBuildFile; fileRef = 5E83A21152612B04575F7A04; };
 		8E72626368178B97FAB25DF3 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/BrowserAudioMonitor.swift"; sourceTree = "<group>"; };
 		3BF28424804A2DA7308067C5 = { isa = PBXBuildFile; fileRef = 8E72626368178B97FAB25DF3; };

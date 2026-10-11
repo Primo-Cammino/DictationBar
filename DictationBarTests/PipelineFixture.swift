@@ -82,8 +82,10 @@ final class PipelineRecorder: RecordingProviding {
         if switchFails { onMicrophoneSwitchFailed?(); return }
         device = id; onMicrophoneChanged?(id)
     }
-    func startBrowser(_ target: BrowserAudioTarget, paths: RecordingPaths) async throws {
-        try await start(microphoneID: "browser:" + target.bundleID, paths: paths)
+    var meetingStarts = 0
+    func startMeeting(microphoneID: String, paths: RecordingPaths) async throws {
+        meetingStarts += 1
+        try await start(microphoneID: microphoneID, paths: paths)
     }
     var starts = 0
     var stops = 0

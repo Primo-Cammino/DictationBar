@@ -53,14 +53,15 @@ final class BrowserBluetoothTests: XCTestCase {
         fixture.model.recordSuggestedBrowser(browser)
         try await fixture.wait { fixture.model.phase == .recording }
         XCTAssertEqual(fixture.browser.requests, 1)
-        XCTAssertEqual(fixture.microphone.requests, 0)
-        XCTAssertEqual(fixture.recorder.device, "browser:test.browser")
+        // Until U4, the browser prompt starts a meeting with the dictation microphone.
+        XCTAssertEqual(fixture.recorder.meetingStarts, 1)
+        XCTAssertEqual(fixture.recorder.device, "selected")
         fixture.stop()
         try await fixture.wait { !fixture.model.isBusy }
         XCTAssertEqual(fixture.transcriber.calls, 0)
         XCTAssertEqual(fixture.inserter.calls, 0)
         XCTAssertEqual(fixture.model.history.count, 1)
-        XCTAssertEqual(fixture.model.history.first?.sourceLabel, "Test Browser · Browser-Audio")
+        XCTAssertEqual(fixture.model.history.first?.isMeeting, true)
         XCTAssertNotNil(fixture.model.history.first?.duration)
         XCTAssertNil(fixture.model.browserSuggestion)
     }

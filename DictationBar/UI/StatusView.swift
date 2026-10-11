@@ -33,6 +33,9 @@ struct StatusView: View {
             .disabled(!dictation.canStart && dictation.phase != .recording && dictation.phase != .preparing)
             Text("\(dictation.shortcut.displayName): Start / Stop · Escape: Stop")
                 .font(.caption).foregroundStyle(.secondary)
+            // ponytail: temporary U8 test button, removed in U9.
+            Button("Meeting testen (vorläufig)") { dictation.startMeetingPreview() }
+                .disabled(!dictation.canStart)
 
             if dictation.needsPreservation {
                 Button("Lokale Sicherung wiederholen") { dictation.repairPreservation() }.disabled(dictation.isBusy)
