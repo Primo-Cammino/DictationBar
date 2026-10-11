@@ -14,20 +14,14 @@ final class DictationModel {
     private(set) var message: String?
     private(set) var actualMicrophoneID: String?
     private var requestedMicrophoneID: String?
-    private var browserOutputs: [BrowserAudioTarget] = []
-    private var browserPolicy = BrowserSuggestionPolicy()
-    private(set) var browserSuggestion: BrowserAudioTarget?
-    @ObservationIgnored var onBrowserSuggestionChanged: ((BrowserAudioTarget?) -> Void)?
     var shortcut: DictationShortcut { configuration.shortcut ?? .default }
     var preferredMicrophone: Microphone? {
         MicrophoneRouting.preferred(microphones, configuredID: configuration.microphoneID,
                                     automaticBluetooth: configuration.preferBluetooth ?? true)
     }
     var sourceName: String {
-        if activeToken?.origin == .browserRecording { return currentEntry?.sourceLabel ?? "Browser-Audio" }
-        return microphones.first { $0.id == actualMicrophoneID }?.name ?? preferredMicrophone?.name ?? "Nicht gewählt"
+        microphones.first { $0.id == actualMicrophoneID }?.name ?? preferredMicrophone?.name ?? "Nicht gewählt"
     }
-    var browserAvailabilityMessage: String? { services?.browserAudio?.availabilityMessage }
     private var generation: UInt64 = 0
     private var insertionAttempted = false
     private(set) var history: [HistoryEntry] = []
@@ -71,7 +65,6 @@ final class DictationModel {
         session = origin != .historyRetry
             ? DictationSession(id: id, createdAt: now, configuration: configuration, token: token)
             : nil
-        updateBrowserSuggestion()
         return token
     }
 
@@ -89,7 +82,7 @@ final class DictationModel {
         return true
     }
 
-    func requestQuit() { quitRequested = true; updateBrowserSuggestion() }
+    func requestQuit() { quitRequested = true }
     func refuseQuit(message: String) {
         quitRequested = false
         self.message = message
@@ -104,7 +97,6 @@ final class DictationModel {
         phase = error == nil ? .idle : .failed
         actualMicrophoneID = nil
         requestedMicrophoneID = nil
-        updateBrowserSuggestion()
     }
 
     func initialize() async {
@@ -141,14 +133,7 @@ final class DictationModel {
             catch { shortcutMessage = Self.userMessage(error) }
         }
         initialized = true
-        services.browserAudio?.onOutputsChanged = { [weak self] outputs in
-            self?.browserOutputs = outputs
-            self?.updateBrowserSuggestion()
-        }
-        if profile == .production {
-            services.microphones.startMonitoring()
-            services.browserAudio?.start()
-        }
+        if profile == .production { services.microphones.startMonitoring() }
     }
 
     func refreshMicrophones() {
@@ -181,43 +166,9 @@ final class DictationModel {
         await saveConfiguration()
     }
 
-    func setBrowserSuggestions(_ value: Bool) async {
-        configuration.browserSuggestions = value
-        updateBrowserSuggestion()
-        await saveConfiguration()
-    }
-
-    private func updateBrowserSuggestion() {
-        let target = browserPolicy.update(browserOutputs, enabled: configuration.browserSuggestions ?? true,
-                                          busy: !canStart)
-        guard target != browserSuggestion else { return }
-        browserSuggestion = target
-        onBrowserSuggestionChanged?(target)
-    }
-
-    func dismissBrowserSuggestion() {
-        if let target = browserSuggestion { browserPolicy.dismiss(target) }
-        updateBrowserSuggestion()
-    }
-
-    func recordSuggestedBrowser(_ target: BrowserAudioTarget) {
-        guard canStart, browserSuggestion == target else { return }
-        browserPolicy.dismiss(target)
-        startMeetingPreview()
-    }
-
-    // ponytail: temporary U8 bridge for the real-Mac test; U9 removes it, U4 builds the meeting flow.
-    func startMeetingPreview() {
-        guard canStart, let token = begin(origin: .browserRecording) else { return }
-        stopReason = nil
-        operationTask = Task { await executeLive(token) }
-    }
-
     private func stopMonitoring() {
         services?.microphones.stopMonitoring()
-        services?.browserAudio?.stop()
         services?.shortcuts.unregister()
-        onBrowserSuggestionChanged?(nil)
     }
 
     func setMicrophone(_ id: String?) async {
@@ -356,7 +307,7 @@ final class DictationModel {
         do {
             guard snapshot.folderBookmark != nil else { throw LocalStoreError.missingFolder }
             if meeting {
-                guard await services.browserAudio?.requestCaptureAccess() == true else { throw BrowserCaptureAccessFailure.denied }
+                guard await services.requestSystemAudioAccess?() == true else { throw SystemAudioAccessFailure.denied }
             }
             guard await services.microphones.requestAccess() else { throw MicrophoneAccessFailure.denied }
             microphones = services.microphones.microphones()
@@ -570,7 +521,7 @@ final class DictationModel {
         case let error as APIKeyFailure: error.localizedDescription
         case let error as TranscriptionFailure: error.localizedDescription
         case let error as MicrophoneAccessFailure: error.localizedDescription
-        case let error as BrowserCaptureAccessFailure: error.localizedDescription
+        case let error as SystemAudioAccessFailure: error.localizedDescription
         case let error as ShortcutFailure: error.localizedDescription
         case is CancellationError: "Vorgang abgebrochen. Vorhandene Dateien bleiben erhalten."
         default: "Lokaler Speicherfehler. Vorhandene Dateien bleiben erhalten; bitte den Aufnahmeordner prüfen."
@@ -583,7 +534,7 @@ enum MicrophoneAccessFailure: LocalizedError {
     var errorDescription: String? { "Mikrofonzugriff fehlt. Bitte DictationBar in den macOS-Datenschutzeinstellungen freigeben." }
 }
 
-enum BrowserCaptureAccessFailure: LocalizedError {
+enum SystemAudioAccessFailure: LocalizedError {
     case denied
-    var errorDescription: String? { "Browser-Aufnahme benötigt die macOS-Freigabe für Bildschirm- und Systemaudioaufnahme. Bitte DictationBar freigeben und erneut starten." }
+    var errorDescription: String? { "Meetings brauchen die Freigabe unter Systemeinstellungen › Datenschutz & Sicherheit › Bildschirm- & Systemaudioaufnahme. Bitte DictationBar dort erlauben und die App neu starten." }
 }

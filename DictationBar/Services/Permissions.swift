@@ -16,7 +16,7 @@ enum MicrophonePermission: Equatable {
     }
 }
 
-/// Screen & System Audio Recording, requested on the first deliberate browser recording.
+/// Screen & System Audio Recording, requested when the first meeting starts.
 enum SystemAudioPermission: Equatable {
     case notVerified, authorized
 

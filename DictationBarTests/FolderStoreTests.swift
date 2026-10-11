@@ -33,4 +33,14 @@ final class FolderStoreTests: XCTestCase {
         do { _ = try await FolderStore(supportURL: f.support).load(); XCTFail("Expected error") }
         catch { XCTAssertEqual(try Data(contentsOf: url), original) }
     }
+
+    func testConfigurationWithRemovedBrowserSettingStillLoads() async throws {
+        let f = try LocalStoreFixture(); defer { f.cleanup() }
+        try FileManager.default.createDirectory(at: f.support, withIntermediateDirectories: true)
+        try Data(#"{"microphoneID":"chosen","preferBluetooth":false,"browserSuggestions":true}"#.utf8)
+            .write(to: f.support.appendingPathComponent("configuration.json"))
+        let loaded = try await FolderStore(supportURL: f.support).load()
+        XCTAssertEqual(loaded.microphoneID, "chosen")
+        XCTAssertEqual(loaded.preferBluetooth, false)
+    }
 }

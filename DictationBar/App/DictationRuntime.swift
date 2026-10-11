@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 @MainActor
@@ -11,7 +12,8 @@ struct DictationServices {
     let transcriber: any TranscriptionProviding
     let shortcuts: any GlobalShortcutProviding
     let inserter: any TextInsertionProviding
-    var browserAudio: (any BrowserAudioMonitoring)? = nil
+    /// Screen & System Audio Recording; nil (tests without a fake) counts as denied.
+    var requestSystemAudioAccess: (() async -> Bool)? = nil
 }
 
 @MainActor
@@ -27,7 +29,7 @@ enum DictationRuntime {
                 keys: keys, transcriber: MistralTranscriptionService(keys: keys),
                 shortcuts: NativeGlobalShortcutService(),
                 inserter: TextInsertionService(environment: NativeTextInsertionEnvironment()),
-                browserAudio: NativeBrowserAudioMonitor()
+                requestSystemAudioAccess: { CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() }
             )
             return DictationModel(profile: .production, services: services)
         }, testing: { DictationModel(profile: .testing) })

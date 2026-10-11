@@ -4,7 +4,6 @@ struct AppConfiguration: Codable, Equatable {
     var microphoneID: String?
     var folderBookmark: Data?
     var preferBluetooth: Bool?
-    var browserSuggestions: Bool?
     var shortcut: DictationShortcut?
 
     init(microphoneID: String? = nil, folderBookmark: Data? = nil) {

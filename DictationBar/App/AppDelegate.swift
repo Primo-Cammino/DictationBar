@@ -4,15 +4,8 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static weak var model: DictationModel?
     private var waitingForTermination = false
-    private let browserToast = BrowserRecordingToast()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if let model = Self.model {
-            model.onBrowserSuggestionChanged = { [weak self, weak model] target in
-                guard let model else { return }
-                self?.browserToast.show(target, model: model)
-            }
-        }
         Task { await Self.model?.initialize() }
     }
 

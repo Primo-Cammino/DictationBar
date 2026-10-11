@@ -47,15 +47,6 @@ struct SettingsView: View {
                 Text("Ordner und manuelle Auswahl gelten ab der nächsten Aufnahme. Bei automatischer Bluetooth-Auswahl wird auch eine laufende Aufnahme sofort auf das verbundene Headset umgestellt.").font(.caption).foregroundStyle(.secondary)
             }
 
-            Section("Browser-Audio") {
-                Toggle("Aufnahmehinweis bei Browser-Audio", isOn: Binding(get: {
-                    dictation.configuration.browserSuggestions ?? true
-                }, set: { value in Task { await dictation.setBrowserSuggestions(value) } }))
-                Text("Der Hinweis startet keine Aufnahme. Erst „Aufnehmen“ erfasst den Ton des gewählten Browsers, einschließlich anderer Tabs. Die WAV bleibt lokal in der History; Transkription erfolgt nur auf Wunsch.")
-                    .font(.caption).foregroundStyle(.secondary)
-                if let message = dictation.browserAvailabilityMessage { Text(message).foregroundStyle(.secondary) }
-            }
-
             Section("Mistral Voxtral · eigener API-Key") {
                 Text(dictation.keyStatus).font(.callout).foregroundStyle(.secondary)
                 SecureField("Mistral-API-Key", text: $key)

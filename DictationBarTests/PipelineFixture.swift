@@ -11,7 +11,7 @@ final class PipelineFixture {
     let transcriber = PipelineTranscriber()
     let inserter = PipelineInserter()
     let shortcuts = PipelineShortcuts()
-    let browser = PipelineBrowserMonitor()
+    let systemAudio = PipelineSystemAudio()
 
     /// `existing` entries are journaled with a valid WAV before the model starts.
     init(profile: RuntimeProfile = .testing, shortcutRegistrationFails: Bool = false,
@@ -28,7 +28,8 @@ final class PipelineFixture {
         try await folders.save(AppConfiguration(microphoneID: "selected", folderBookmark: FolderStore.bookmark(for: files.folder)))
         let services = DictationServices(folders: folders, history: history, recordings: RecordingStore(history: history),
             microphones: microphone, recorder: recorder, keys: TestKeyStore(), transcriber: transcriber,
-            shortcuts: shortcuts, inserter: inserter, browserAudio: browser)
+            shortcuts: shortcuts, inserter: inserter,
+            requestSystemAudioAccess: { [systemAudio] in systemAudio.request() })
         shortcuts.registrationFails = shortcutRegistrationFails
         model = DictationModel(profile: profile, services: services)
         await model.initialize()
@@ -177,12 +178,8 @@ final class PipelineShortcuts: GlobalShortcutProviding {
 }
 
 @MainActor
-final class PipelineBrowserMonitor: BrowserAudioMonitoring {
-    var onOutputsChanged: (([BrowserAudioTarget]) -> Void)?
-    var availabilityMessage: String? { nil }
+final class PipelineSystemAudio {
     var requests = 0
     var granted = true
-    func start() { }
-    func stop() { }
-    func requestCaptureAccess() async -> Bool { requests += 1; return granted }
+    func request() -> Bool { requests += 1; return granted }
 }
