@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusPanel: StatusPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.applicationIconImage = BrandIcon.app
         if let model = Self.model {
             statusPanel = StatusPanel(model: model)
             followStatusPanel(model)

@@ -29,8 +29,11 @@ struct DictationBarApp: App {
         .windowResizability(.contentSize)
         .commands { DictationCommands() }
 
-        MenuBarExtra("DictationBar", systemImage: dictation.phase == .recording ? "record.circle" : "waveform") {
+        MenuBarExtra {
             StatusView(model: model, dictation: dictation)
+        } label: {
+            Image(nsImage: BrandIcon.menuBar(recording: dictation.phase == .recording))
+                .accessibilityLabel("DictationBar")
         }
         .menuBarExtraStyle(.window)
 
@@ -43,6 +46,44 @@ struct DictationBarApp: App {
             HistoryView(dictation: dictation)
         }
         .defaultSize(width: 680, height: 520)
+    }
+}
+
+/// The app's mark: a waveform in a rounded frame, drawn in code.
+// ponytail: runtime Dock icon only; Finder shows the generic icon until an AppIcon asset catalog exists.
+@MainActor
+enum BrandIcon {
+    /// Template image, so the menu bar tints it for light and dark mode.
+    static func menuBar(recording: Bool) -> NSImage {
+        let image = NSImage(size: NSSize(width: 22, height: 18), flipped: false) { rect in
+            let frame = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 4.5, yRadius: 4.5)
+            frame.lineWidth = 2
+            NSColor.black.setStroke()
+            frame.stroke()
+            drawSymbol(recording ? "record.circle" : "waveform", pointSize: 10, color: .black, in: rect)
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
+    static let app = NSImage(size: NSSize(width: 512, height: 512), flipped: false) { _ in
+        // Body inset follows the macOS icon grid (824 of 1024).
+        let body = NSRect(x: 50, y: 50, width: 412, height: 412)
+        let shape = NSBezierPath(roundedRect: body, xRadius: 92, yRadius: 92)
+        NSGradient(starting: .systemIndigo, ending: .systemBlue)?.draw(in: shape, angle: 90)
+        drawSymbol("waveform", pointSize: 200, color: .white, in: body)
+        return true
+    }
+
+    private static func drawSymbol(_ name: String, pointSize: CGFloat, color: NSColor, in rect: NSRect) {
+        let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [color]))
+        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(config) else { return }
+        let size = symbol.size
+        symbol.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2,
+                               width: size.width, height: size.height))
     }
 }
 
