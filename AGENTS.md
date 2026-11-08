@@ -1,6 +1,6 @@
 # Lokale Entwicklung von DictationBar
 
-Der aktive Projektordner ist `DictationBar`.
+Der aktive Projektordner ist dieser Repository-Ordner (lokal `spechless_macos`).
 Der frühere Nachbarordner `speeechless_macos` liegt vollständig unter
 `.local-backups/consolidation-20261009-edo8hg4j/extracted-slice-1/`.
 Er und das erhaltene Slice-1-ZIP sind Ausgangssicherungen. Es gibt nur einen
@@ -9,8 +9,8 @@ aktiven Entwicklungsordner; keine Arbeit in Sicherungskopien.
 ## Arbeitsweise
 
 - Entwicklung, Build, XCTest und App-Prüfung ausschließlich auf dem lokalen Mac.
-  Keine Cloud-Ausführung der Entwicklung, Projekt-Uploads, Veröffentlichungen
-  oder Remote-Pushes. Die gewählte Mistral-Transkription ist eine Online-
+  Keine Cloud-Ausführung der Entwicklung. Pushes nach `origin` nur auf
+  ausdrückliche Nutzeranweisung, vorher Secret-Scan (`gitleaks git`). Die gewählte Mistral-Transkription ist eine Online-
   Produktfunktion mit dem eigenen Key des Nutzers; sie ist kein Cloud-Build
   oder Upload des Projekts.
 - Compound Engineering als Ablauf: Anforderungen lesen, kleinen Slice planen,
@@ -33,7 +33,11 @@ aktiven Entwicklungsordner; keine Arbeit in Sicherungskopien.
   wurde keine `.git` gefunden; eine Cloud-Historie oder einen Commit nicht erfinden.
   Das neue lokale Repository begann mit Import-Commit `313d97e` auf
   `feat/local-slice1-validation`; dieser Commit ist keine wiederhergestellte
-  Cloud-Historie. Es ist kein Remote eingerichtet.
+  Cloud-Historie. Seit 08.11.2026 ist `origin` das öffentliche Repository
+  `Primo-Cammino/DictationBar` (Branch `main`). Dessen Historie wurde vor der
+  Veröffentlichung bereinigt (noreply-Mail, keine lokalen Pfade) und hat daher
+  andere Hashes; die alte Historie liegt als Branch `feat/local-slice1-validation`
+  und in `.local-backups/publish-20261108/before-publish.bundle`.
 - Slice 2 erst nach erfolgreichem nativen Build, neun tatsächlich bestandenen
   XCTest-Tests und dokumentierter realer Menüleisten-Abnahme beginnen.
 - Keine globalen TCC-Resets und keine automatischen Permission-Requests in Slice 1.
